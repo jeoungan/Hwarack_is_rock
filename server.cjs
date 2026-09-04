@@ -4,15 +4,15 @@ const path = require('node:path');
 const os = require('node:os');
 const ROOT = process.argv.includes('--dist') ? path.join(__dirname, 'dist') : __dirname;
 const PORT = Number(process.env.PORT) || 4173;
-const files = new Set(['index.html', 'ranking.html', 'ranking.css', 'ranking.js', 'record-config.js', 'firebase-client.js', 'style.css', 'game.js', 'rhythm-core.js', 'asset-map.js', 'render-quality.js', 'leaderboard.js', 'assets/kakao-share-20260904.jpg', 'assets/neon-festival.png', 'assets/opening.mp4', 'assets/title-logo.png']);
-const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4' };
+const files = new Set(['index.html', 'ranking.html', 'ranking.css', 'ranking.js', 'record-config.js', 'firebase-client.js', 'style.css', 'game.js', 'rhythm-core.js', 'music-track.js', 'music-player.js', 'asset-map.js', 'render-quality.js', 'leaderboard.js', 'assets/kakao-share-20260904.jpg', 'assets/neon-festival.png', 'assets/opening.mp4', 'assets/title-logo.png']);
+const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.mp3': 'audio/mpeg' };
 const server = http.createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   let relative;
   try { relative = decodeURIComponent(new URL(req.url, 'http://localhost').pathname).replace(/^\/+/, '') || 'index.html'; }
   catch { res.writeHead(400); return res.end('Bad request'); }
   const isCharacter = /^character\/[a-zA-Z0-9_ ()-]+\.png$/.test(relative);
-  const isVersioned = /^(?:assets\/optimized|static)\/[a-zA-Z0-9_-]+\.[a-f0-9]{12}\.(?:webp|mp4|js|css)$/.test(relative);
+  const isVersioned = /^(?:assets\/optimized|static)\/[a-zA-Z0-9_-]+\.[a-f0-9]{12}\.(?:webp|mp4|mp3|js|css)$/.test(relative);
   if (!files.has(relative) && !isCharacter && !isVersioned) { res.writeHead(404); return res.end('Not found'); }
   const file = path.resolve(ROOT, relative);
   if (!file.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end(); }

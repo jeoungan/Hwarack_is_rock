@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#100824">
-  <meta name="description" content="화락제의 주인공은 너! 음악 없이도 즐기는 원근형 4레인 리듬 게임.">
+  <meta name="description" content="화락제의 주인공은 너! 음악의 박자에 맞춰 즐기는 원근형 4레인 리듬 게임.">
   <title>화락제도 락이다 — HWARAK LIVE</title>
   <link rel="canonical" href="https://jeoungan.github.io/Hwarack_is_rock/">
   <meta property="og:type" content="website">
@@ -25,6 +25,8 @@
   <meta name="twitter:image" content="https://jeoungan.github.io/Hwarack_is_rock/assets/kakao-share-20260904.jpg">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23fbe477'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='46'%3E★%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
+  <script defer src="music-track.js"></script>
+  <script defer src="music-player.js"></script>
   <script defer src="rhythm-core.js"></script>
   <script defer src="asset-map.js"></script>
   <script defer src="render-quality.js"></script>
@@ -38,7 +40,7 @@
     <header class="topbar">
       <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><strong>HWARAK<span>LIVE</span></strong><span class="brand-caption">오늘 무대의 주인공, 너.</span></div>
       <div class="tools">
-        <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="박자음 켜짐, 누르면 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">박자음 ON</span></button>
+        <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="음악 켜짐, 누르면 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">음악 ON</span></button>
         <button id="fullscreen" class="tool" aria-label="전체 화면">⛶ <span>전체 화면</span></button>
       </div>
     </header>
@@ -75,7 +77,7 @@
         <div class="time-panel"><span id="timer-label" class="timer-label">남은 시간</span><div><span id="timer">02:00</span><button id="pause-button" aria-label="일시정지">Ⅱ</button></div><span id="speed">SPEED ×1.00</span></div>
       </div>
       <div id="round-progress" class="round-progress" hidden><div id="round-progress-fill"></div><span aria-hidden="true"></span></div>
-      <div id="beat-indicator" class="beat-indicator" aria-label="시각 박자 표시" hidden><i></i><i></i><i></i><i></i><span>120 BPM</span></div>
+      <div id="beat-indicator" class="beat-indicator" aria-label="시각 박자 표시" hidden><i></i><i></i><i></i><i></i><span>100 BPM</span></div>
       <div id="phase-announcement" class="phase-announcement" hidden><span>LET'S ROCK!</span><strong>이제 두 개씩!</strong><small>DK · FJ · DJ · FK</small></div>
       <div id="clear-cue" class="clear-cue" hidden><span>PHASE 1 CLEAR</span><strong id="clear-message">다 함께, 앙코르!</strong></div>
       <div id="countdown" class="countdown" aria-live="polite" hidden><span id="countdown-word">Ready?</span></div>

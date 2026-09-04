@@ -1,12 +1,15 @@
 (function (root, factory) {
-  const api = factory();
+  const track = typeof module === 'object' && module.exports ? require('./music-track.js') : root.HwarakTrack;
+  const api = factory(track);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.HwarakCore = api;
-})(globalThis, function () {
+})(globalThis, function (track) {
   'use strict';
   const DURATION = 120;
-  const PRACTICE = 30;
-  const BEAT = 0.5;
+  const PRACTICE = 15;
+  const BEAT = 60 / track.bpm;
+  const BEAT_OFFSET = track.beatOffset;
+  const FIRST_HIT = BEAT_OFFSET + track.firstBeat * BEAT;
   const PERFECT = 0.045;
   const SPECIAL = 0.080;
   const GREAT = 0.120;
@@ -45,30 +48,31 @@
   function travelAt(time, phase = 1) { return 2.4 / speedAt(time, phase); }
   function noteGenerator(seed, phase) {
     const rng = random(seed);
-    let singles = [], pairs = [], id = 0, challengeCount = 0, hit = 2.5;
+    let singles = [], pairs = [], id = 0, challengeCount = 0, beatIndex = track.firstBeat;
     const nextSingle = () => {
       if (!singles.length) singles = shuffle([0, 1, 2, 3], rng);
       return [singles.pop()];
     };
     return () => {
+      const hit = +(BEAT_OFFSET + beatIndex * BEAT).toFixed(6);
       const travel = travelAt(hit, phase);
       const spawn = hit - travel;
       let lanes = nextSingle();
       if (phase === 2 || spawn >= PRACTICE) {
-        const chance = phase === 2 ? .54 : 0.24 + 0.30 * clamp((hit - PRACTICE) / 90);
+        const chance = phase === 2 ? .54 : 0.24 + 0.30 * clamp((hit - PRACTICE) / (DURATION - PRACTICE));
         if (challengeCount++ === 0 || rng() < chance) {
           if (!pairs.length) pairs = shuffle(PAIRS, rng);
           lanes = pairs.pop().slice();
         }
       }
       const note = { id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {} };
-      hit += phase === 2 || hit >= 31.5 ? BEAT : 1;
+      beatIndex += phase === 2 || spawn >= PRACTICE ? 1 : 2;
       return note;
     };
   }
   function createChart(seed) {
     const next = noteGenerator(seed, 1), chart = [];
-    for (let note = next(); note.hit < DURATION; note = next()) chart.push(note);
+    for (let note = next(); note.hit + GOOD < DURATION; note = next()) chart.push(note);
     return chart;
   }
   class Session {
@@ -160,11 +164,8 @@
       const note = this.chart.filter(n => !n.resolved && n.lanes.includes(lane) && Math.abs(n.hit - time) <= GOOD + 1e-9)
         .sort((a, b) => Math.abs(a.hit - time) - Math.abs(b.hit - time))[0];
       if (!note) {
-        this.counts.stray++;
-        this.combo = 0;
-        this.perfectStreak = 0;
-        // Empty taps cannot manufacture MISS points; only chart events award points.
-        this.onJudge({ judgement: 'stray', lanes: [lane], delta: null, points: 0, bonus: 0 });
+        // A distant/absent note is not a judgement. Only an actually missed note
+        // breaks the combo; warm-up taps never change score or accuracy.
         return;
       }
       note.inputs[lane] = { time, delta: time - note.hit };
@@ -192,5 +193,5 @@
       return this.chart.filter(n => !n.resolved && time >= n.spawn && time <= n.hit + GOOD);
     }
   }
-  return { DURATION, PRACTICE, BEAT, PERFECT, SPECIAL, GREAT, GOOD, POINTS, BONUS_CHARGE, CHORD_GAP, FAILURE_LIMIT, INTERMISSION, PAIRS, KEYS, speedAt, travelAt, createChart, Session };
+  return { DURATION, PRACTICE, BEAT, BEAT_OFFSET, FIRST_HIT, CHART_VERSION: track.version, PERFECT, SPECIAL, GREAT, GOOD, POINTS, BONUS_CHARGE, CHORD_GAP, FAILURE_LIMIT, INTERMISSION, PAIRS, KEYS, speedAt, travelAt, createChart, Session };
 });

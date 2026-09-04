@@ -12,7 +12,7 @@
     $('record-button').textContent = '기록 저장하기'; $('record-name').value = '';
     current.ticket = Promise.resolve().then(() => {
       if (!window.HwarakRecords) throw new Error('기록 서버 파일을 불러오지 못했어요.');
-      return window.HwarakRecords.request('begin', { seed: seed >>> 0, phase });
+      return window.HwarakRecords.request('begin', { seed: seed >>> 0, phase, chartVersion: window.HwarakCore.CHART_VERSION });
     })
       .then(data => data.ticket).catch(error => { current.ticketError = error.message; return null; });
   }

@@ -2,13 +2,15 @@
   'use strict';
   const C = window.HwarakCore;
   const assets = window.HwarakAssets;
+  const music = new window.HwarakMusic.Player(assets[window.HwarakTrack.asset], window.HwarakTrack);
+  let launching = false;
   const quality = new window.HwarakQuality.Controller();
   const $ = id => document.getElementById(id);
   const stage = $('stage'), canvas = $('game-canvas'), ctx = canvas.getContext('2d', { alpha: false });
   const openingVideo = $('opening-video');
   const pads = [...document.querySelectorAll('.key-pad')];
   const COLORS = ['#ffdf32', '#21f5f3', '#ff42c8', '#ad79ff'];
-  const JUDGE_COLORS = { perfect: '#fff18b', special: '#ff82e7', great: '#6dffff', good: '#c7afff', miss: '#ff739d', stray: '#ff739d' };
+  const JUDGE_COLORS = { perfect: '#fff18b', special: '#ff82e7', great: '#6dffff', good: '#c7afff', miss: '#ff739d' };
   const CODE_TO_LANE = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
   const POSE_MASK = { 1: 'D', 2: 'F', 4: 'J', 8: 'K', 9: 'DK', 6: 'FJ', 5: 'DJ', 10: 'FK' };
   const INTRO_DURATION = 3.5; // Three one-second Ready pumps, then half a second of Go.
@@ -32,14 +34,14 @@
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
   let intermissionElapsed = 0, phaseOneScore = 0, encoreBeat = -1, titleElapsed = 0;
-  let best = Math.max(0, Number(storeGet('hwarak-best-v2', '0')) || 0);
-  const audio = { ctx: null, gain: null, enabled: storeGet('hwarak-sound', 'true') !== 'false', nextBeat: -7, nodes: new Set() };
+  let best = Math.max(0, Number(storeGet('hwarak-best-music-v2', '0')) || 0);
+  const audio = { ctx: null, gain: null, enabled: storeGet('hwarak-sound', 'true') !== 'false', nodes: new Set() };
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
   const lerp = (a, b, t) => a + (b - a) * t;
   const setText = (id, text) => { const el = $(id); if (el.textContent !== text) el.textContent = text; };
   const visible = (id, show) => { $(id).hidden = !show; };
   const randomSeed = () => { try { return crypto.getRandomValues(new Uint32Array(1))[0]; } catch { return Date.now() >>> 0; } };
-  const currentTime = () => mode === 'playing' && !manual ? baseTime + (performance.now() - anchor) / 1000 : time;
+  const currentTime = () => mode === 'playing' && !manual ? (music.time() ?? baseTime + (performance.now() - anchor) / 1000) : time;
   const formatTime = (seconds, precise = false) => {
     const ticks = Math.floor(Math.max(0, seconds) * 10 + 1e-6), whole = Math.floor(ticks / 10);
     return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}${precise ? '.' + ticks % 10 : ''}`;
@@ -101,7 +103,7 @@
   }
   function beatMotion(t) {
     if (reducedMotion) return { bounce: 0, squash: 0, pulse: .3 };
-    const phase = ((t % C.BEAT) + C.BEAT) % C.BEAT / C.BEAT;
+    const phase = (((t - C.BEAT_OFFSET) % C.BEAT) + C.BEAT) % C.BEAT / C.BEAT;
     return { bounce: Math.sin(Math.PI * phase) ** 2, squash: Math.exp(-phase * 16), pulse: Math.exp(-phase * 9) };
   }
   function openingCue(t) {
@@ -424,14 +426,14 @@
   }
 
   async function initAudio() {
-    if (!audio.enabled) return;
     try {
       if (!audio.ctx) {
-        const Audio = window.AudioContext || window.webkitAudioContext;
-        if (!Audio) return;
-        audio.ctx = new Audio(); audio.gain = audio.ctx.createGain(); audio.gain.gain.value = .18; audio.gain.connect(audio.ctx.destination);
+        audio.ctx = music.context;
+        if (!audio.ctx) return;
+        audio.gain = audio.ctx.createGain(); audio.gain.gain.value = .18; audio.gain.connect(audio.ctx.destination);
       }
-      if (audio.ctx.state === 'suspended') await audio.ctx.resume();
+      await music.unlock();
+      music.setEnabled(audio.enabled);
       updateSoundUI();
     } catch { /* Audio is optional; the visual beat is always available. */ }
   }
@@ -444,37 +446,26 @@
     oscillator.connect(gain); gain.connect(audio.gain); oscillator.start(when); oscillator.stop(when + duration + .01);
     audio.nodes.add(oscillator); oscillator.onended = () => { audio.nodes.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
   }
-  function stopAudio() { for (const node of audio.nodes) { try { node.stop(); } catch {} } audio.nodes.clear(); }
-  function scheduleBeat() {
-    if (!audio.ctx || !audio.enabled || manual || mode !== 'playing') return;
-    const end = Math.floor((time + .12) / C.BEAT);
-    for (let beat = audio.nextBeat; beat <= end; beat++) {
-      const at = beat * C.BEAT;
-      if (at >= time - .015 && (session?.phase === 2 || at < C.DURATION)) {
-        const when = audio.ctx.currentTime + Math.max(.003, at - time);
-        tone(when, beat % 4 === 0 ? 140 : 100, .075, beat % 4 === 0 ? .7 : .44, true);
-      }
-    }
-    audio.nextBeat = end + 1;
-  }
+  function stopAudio(stopMusic = true) { if (stopMusic) music.stop(); for (const node of audio.nodes) { try { node.stop(); } catch {} } audio.nodes.clear(); }
   function updateSoundUI() {
     const active = audio.enabled && audio.ctx?.state === 'running';
     $('sound-toggle').setAttribute('aria-pressed', String(!!active));
-    $('sound-toggle').setAttribute('aria-label', active ? '박자음 켜짐, 누르면 끄기' : '누르면 박자음 켜기');
-    document.querySelector('.sound-label').textContent = active ? '박자음 ON' : audio.enabled ? '박자음 켜기' : '박자음 OFF';
+    $('sound-toggle').setAttribute('aria-label', active ? '음악 켜짐, 누르면 끄기' : '누르면 음악 켜기');
+    document.querySelector('.sound-label').textContent = active ? '음악 ON' : audio.enabled ? '음악 켜기' : '음악 OFF';
   }
   function onJudge(event) {
+    if (event.judgement === 'stray') return;
     const note = event.noteId == null ? null : session?.chart.find(note => note.id === event.noteId);
     if (note && session.phase === 1 && time - note.hit > .45) return;
     const now = time;
-    if (event.judgement !== 'miss' && event.judgement !== 'stray') {
+    if (event.judgement !== 'miss') {
       for (const lane of event.lanes) fx.push(hitLight(lane, now, event.noteId || 0));
       const mask = event.lanes.reduce((value, lane) => value | (1 << lane), 0);
       pose = POSE_MASK[mask] || C.KEYS[event.lanes[0]]; lastHitTime = time;
       if (audio.ctx) tone(audio.ctx.currentTime + .002, 470 + event.lanes[0] * 90, .035, .14);
     }
-    feedback = { start: now, label: event.judgement === 'stray' ? 'MISS' : event.judgement.toUpperCase(), color: JUDGE_COLORS[event.judgement],
-      detail: event.judgement === 'stray' ? '엇박자 · +0' : `+${event.points}` + (event.bonus ? '  /  PERFECT BONUS +1' : '') };
+    feedback = { start: now, label: event.judgement.toUpperCase(), color: JUDGE_COLORS[event.judgement],
+      detail: `+${event.points}` + (event.bonus ? '  /  PERFECT BONUS +1' : '') };
   }
   function updatePose() {
     if (!session) return;
@@ -525,8 +516,9 @@
     intermissionElapsed = 0; encoreBeat = -1;
     if (phase === 1) phaseOneScore = 0;
     time = -INTRO_DURATION; baseTime = -INTRO_DURATION; anchor = performance.now(); manual = false; pose = 'normal'; lastHitTime = -99;
-    session = new C.Session(seed, onJudge, { phase }); audio.nextBeat = -7;
+    session = new C.Session(seed, onJudge, { phase });
     window.HwarakLeaderboard?.begin(session.seed, phase);
+    music.start(time);
     setMode('playing'); updateHUD();
     $('game-status').textContent = phase === 2 ? '2페이즈 도전. Special 이상으로 버티세요. 다섯 번째 실수에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
   }
@@ -537,7 +529,7 @@
     window.HwarakLeaderboard?.abandon();
     stopAudio(); clearInputs(); session = null;
     time = baseTime = -INTRO_DURATION; anchor = lastFrame = performance.now();
-    manual = false; resumeRemaining = 0; audio.nextBeat = -7;
+    manual = false; resumeRemaining = 0;
     fx = []; feedback = null; phaseAnnounced = false;
     intermissionElapsed = phaseOneScore = titleElapsed = 0; encoreBeat = -1;
     pose = 'normal'; lastLane = 0; lastHitTime = -99;
@@ -599,7 +591,16 @@
   }
   function startFromTitle() {
     if (mode !== 'title' || !ready) return;
-    initAudio(); startGame();
+    launchGame();
+  }
+  async function launchGame(phase = 1) {
+    if (launching || !ready) return;
+    launching = true;
+    const initialMode = mode;
+    try {
+      await initAudio();
+      if (mode === initialMode && !document.hidden) startGame(randomSeed(), phase);
+    } finally { launching = false; }
   }
   function pauseGame(reason = '준비되면 다시 무대로 돌아가요.') {
     if (mode !== 'playing' && mode !== 'resuming') return;
@@ -614,7 +615,7 @@
   function endRound() {
     if (mode !== 'playing' && mode !== 'resuming') return;
     time = session.endTime; baseTime = time;
-    stopAudio(); clearInputs(); visible('countdown', false);
+    stopAudio(session.phase !== 1); clearInputs(); visible('countdown', false);
     if (session.phase === 1) {
       phaseOneScore = session.score; intermissionElapsed = 0; encoreBeat = -1;
       fx = []; feedback = null; setMode('intermission'); advanceEncore(0);
@@ -624,10 +625,11 @@
   }
   function advanceEncore(seconds) {
     intermissionElapsed = Math.min(C.INTERMISSION, intermissionElapsed + seconds);
-    const lastBeat = Math.min(9, Math.floor(intermissionElapsed / C.BEAT));
+    const lastBeat = Math.floor((intermissionElapsed - C.BEAT_OFFSET) / C.BEAT);
     // Skip expired bursts after a large test/frame jump; each beat emits only once.
-    for (let beat = Math.max(encoreBeat + 1, Math.ceil((intermissionElapsed - HIT_LIGHT_DURATION) / C.BEAT)); beat <= lastBeat; beat++) {
-      const finale = beat === 8, start = C.DURATION + beat * C.BEAT;
+    for (let beat = Math.max(encoreBeat + 1, Math.ceil((intermissionElapsed - C.BEAT_OFFSET - HIT_LIGHT_DURATION) / C.BEAT)); beat <= lastBeat; beat++) {
+      const at = C.BEAT_OFFSET + beat * C.BEAT;
+      const finale = beat === Math.ceil((4 - C.BEAT_OFFSET) / C.BEAT), start = C.DURATION + at;
       for (const [index, x] of [.235, .5, .765].entries()) {
         const center = index === 1, effect = hitLight((index + beat) % 4, start, 70000 + beat * 3 + index);
         effect.kind = 'encore'; effect.position = { x, y: .615 };
@@ -636,7 +638,7 @@
         effect.motes.length = Math.min(effect.motes.length, finale ? center ? 110 : 68 : center ? 68 : 40);
         fx.push(effect);
       }
-      if (!manual && audio.enabled && audio.ctx?.state === 'running' && intermissionElapsed - beat * C.BEAT < .1) {
+      if (!manual && audio.enabled && audio.ctx?.state === 'running' && intermissionElapsed - at < .1) {
         tone(audio.ctx.currentTime + .003, finale ? 660 : beat % 2 ? 330 : 440, .07, .16);
       }
     }
@@ -651,7 +653,7 @@
     const survival = session.phase === 2;
     const accuracy = session.accuracy, grade = accuracy >= 95 ? 'S' : accuracy >= 85 ? 'A' : accuracy >= 70 ? 'B' : 'C';
     const newBest = !survival && session.score > best;
-    if (newBest) { best = session.score; storeSet('hwarak-best-v2', best); }
+    if (newBest) { best = session.score; storeSet('hwarak-best-music-v2', best); }
     setText('result-title', survival ? '여기까지, 멋진 도전!' : '1페이즈 클리어!');
     setText('result-eyebrow', survival ? 'SURVIVAL RESULT' : 'READY FOR THE NEXT STAGE?');
     setText('result-score-label', survival ? '2페이즈 점수' : '1페이즈 점수');
@@ -664,7 +666,7 @@
     setText('result-grade', grade); setText('result-score', session.score.toLocaleString('ko-KR'));
     setText('result-combo', String(session.maxCombo)); setText('result-accuracy', accuracy.toFixed(1) + '%');
     setText('result-breakdown', `기본 ${session.baseScore} + Perfect 보너스 ${session.bonusScore}`);
-    setText('result-counts', `PERFECT ${session.counts.perfect} · SPECIAL ${session.counts.special} · GREAT ${session.counts.great} · GOOD ${session.counts.good} · MISS ${session.counts.miss} · 엇박자 ${session.counts.stray}`);
+    setText('result-counts', `PERFECT ${session.counts.perfect} · SPECIAL ${session.counts.special} · GREAT ${session.counts.great} · GOOD ${session.counts.good} · MISS ${session.counts.miss}`);
     $('game-status').textContent = survival ? `도전 종료. 버틴 시간 ${formatTime(time, true)}, 2페이즈 점수 ${session.score}.` : `1페이즈 완료. 점수 ${session.score}. 도전하기 또는 처음부터 다시를 선택하세요.`;
   }
   function updateHUD() {
@@ -679,30 +681,32 @@
     $('bonus-panel').classList.toggle('charged', session.perfectStreak >= C.BONUS_CHARGE);
     [...$('streak-dots').children].forEach((dot, index) => dot.classList.toggle('filled', index < session.perfectStreak));
     const encore = mode === 'intermission';
-    setText('combo', encore ? '끝까지 해냈다!' : session.combo ? `${session.combo} COMBO!` : elapsed < 2.5 ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
+    setText('combo', encore ? '끝까지 해냈다!' : session.combo ? `${session.combo} COMBO!` : elapsed < C.FIRST_HIT ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
     setText('phase-label', encore ? 'ENCORE' : survival ? 'SURVIVAL' : practice ? 'WARM UP' : 'PHASE 1'); setText('phase-title', encore ? '앙코르!' : survival ? '2페이즈 도전' : practice ? '연습 무대' : '본무대');
-    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `실수 ${session.failures} / 5 · Special 이상!` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(30 - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
+    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `실수 ${session.failures} / 5 · Special 이상!` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(C.PRACTICE - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
     visible('survival-lives', survival);
     [...$('survival-lives').children].forEach((life, i) => life.classList.toggle('lost', i < session.failures));
     $('survival-lives').setAttribute('aria-label', `실수 ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
     setText('speed', `SPEED ×${C.speedAt(elapsed, session.phase).toFixed(2)}`);
     $('round-progress-fill').style.width = `${survival ? (1 - session.failures / C.FAILURE_LIMIT) * 100 : clamp(elapsed / C.DURATION) * 100}%`;
-    const beat = Math.floor(elapsed / C.BEAT) % 4;
+    const beat = ((Math.floor((elapsed - C.BEAT_OFFSET) / C.BEAT) % 4) + 4) % 4;
     [...$('beat-indicator').querySelectorAll('i')].forEach((dot, i) => dot.classList.toggle('active', i === beat));
     drawCountdown();
-    visible('phase-announcement', !survival && mode === 'playing' && elapsed >= 30 && elapsed < 31.6);
-    if (!survival && !phaseAnnounced && elapsed >= 30) { phaseAnnounced = true; $('game-status').textContent = '본무대 시작. DK, FJ, DJ, FK 동시 노트가 함께 나오고 속도가 점점 빨라집니다.'; }
+    visible('phase-announcement', !survival && mode === 'playing' && elapsed >= C.PRACTICE && elapsed < C.PRACTICE + 1.6);
+    if (!survival && !phaseAnnounced && elapsed >= C.PRACTICE) { phaseAnnounced = true; $('game-status').textContent = '본무대 시작. DK, FJ, DJ, FK 동시 노트가 함께 나오고 속도가 점점 빨라집니다.'; }
   }
   function update(now, delta) {
     if (mode === 'title' || mode === 'revealing') titleElapsed += delta;
     if (mode === 'intermission' && !manual) {
-      advanceEncore(delta);
+      const musicTime = music.time();
+      advanceEncore(musicTime == null ? delta : Math.max(0, musicTime - C.DURATION - intermissionElapsed));
     }
     if (mode === 'resuming') {
       resumeRemaining -= delta;
-      if (resumeRemaining <= 0) { baseTime = time; anchor = now; audio.nextBeat = Math.ceil(time / C.BEAT); setMode('playing'); }
+      if (resumeRemaining <= 0) { baseTime = time; anchor = now; if (!manual) music.start(time); setMode('playing'); }
     }
-    if (mode === 'playing') { time = currentTime(); session.advance(time); if (session.finished) endRound(); else scheduleBeat(); }
+    if (mode === 'playing') { time = currentTime(); session.advance(time); if (session.finished) endRound();
+      else if (!manual && music.source && music.context.state !== 'running') pauseGame('음악 재생이 잠시 멈췄어요. 준비되면 이어서 플레이하세요.'); }
     updateHUD();
   }
   function frame(now) {
@@ -762,7 +766,7 @@
     if (event.repeat) return;
     if (event.code === 'KeyR' && mode === 'title') { event.preventDefault(); startFromTitle(); return; }
     if (event.code === 'Escape') { event.preventDefault(); if (mode === 'paused') resumeGame(); else pauseGame(); }
-    if (event.code === 'Enter' && mode === 'result' && event.target.tagName !== 'BUTTON') startGame();
+    if (event.code === 'Enter' && mode === 'result' && event.target.tagName !== 'BUTTON') launchGame();
   });
   window.addEventListener('keyup', event => { const lane = CODE_TO_LANE[event.code]; if (lane != null) release(lane, event.code); });
   window.addEventListener('blur', () => pauseGame('화면을 벗어나 잠시 멈췄어요. 준비되면 이어서 플레이하세요.'));
@@ -770,6 +774,9 @@
     if (document.hidden) {
       if (phone) resetDepartedGame();
       else pauseGame('화면을 벗어나 잠시 멈췄어요.');
+      if (mode === 'intermission') stopAudio();
+    } else if (mode === 'intermission' && !manual) {
+      music.start(C.DURATION + intermissionElapsed);
     }
     syncOpeningPlayback();
   });
@@ -803,14 +810,14 @@
     setText('opening-sound', openingVideo.muted ? '♫ 소리 켜기' : '♫ 소리 끄기');
     syncOpeningPlayback();
   });
-  $('retry-button').addEventListener('click', () => startGame());
-  $('challenge-button').addEventListener('click', () => { if (mode === 'result') { initAudio(); startGame(randomSeed(), 2); } });
-  $('restart-pause').addEventListener('click', () => startGame());
+  $('retry-button').addEventListener('click', () => launchGame());
+  $('challenge-button').addEventListener('click', () => { if (mode === 'result') { launchGame(2); } });
+  $('restart-pause').addEventListener('click', () => launchGame());
   $('pause-button').addEventListener('click', () => pauseGame()); $('resume-button').addEventListener('click', resumeGame);
   $('sound-toggle').addEventListener('click', () => {
     if (audio.enabled && audio.ctx?.state !== 'running') { initAudio(); return; }
-    audio.enabled = !audio.enabled; storeSet('hwarak-sound', audio.enabled); stopAudio();
-    if (audio.enabled) { initAudio(); audio.nextBeat = Math.ceil(currentTime() / C.BEAT); } updateSoundUI();
+    audio.enabled = !audio.enabled; storeSet('hwarak-sound', audio.enabled); stopAudio(false); music.setEnabled(audio.enabled);
+    if (audio.enabled) initAudio(); updateSoundUI();
   });
   const unlockAudio = event => {
     if (mode !== 'playing' && mode !== 'title' && mode !== 'resuming') return;
@@ -824,7 +831,7 @@
 
   // Readable state and deterministic time stepping for repeatable gameplay verification.
   window.render_game_to_text = () => JSON.stringify({
-    mode, ready, time: +time.toFixed(3), roundPhase: session?.phase || 1, phase: session?.phase === 2 ? 'survival' : time < 30 ? 'practice' : 'challenge', phone, portrait, rotateRequired: false,
+    mode, ready, time: +time.toFixed(3), roundPhase: session?.phase || 1, phase: session?.phase === 2 ? 'survival' : time < C.PRACTICE ? 'practice' : 'challenge', phone, portrait, rotateRequired: false,
     viewport: { width, height, noteHorizon: noteHorizon(), targets: [0, 1, 2, 3].map(target) },
     failures: session?.failures || 0, failureLimit: C.FAILURE_LIMIT, survivalTime: session?.phase === 2 ? +Math.max(0, time).toFixed(3) : null,
     phaseOneScore, combinedScore: session?.phase === 2 ? phaseOneScore + session.score : session?.score || 0,
@@ -846,6 +853,7 @@
     speed: +C.speedAt(Math.max(0, time), session?.phase || 1).toFixed(3),
     notes: session?.visible(time).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit, spawn: +n.spawn.toFixed(3), travel: +n.travel.toFixed(3), partial: Object.keys(n.inputs).map(l => C.KEYS[l]) })) || [],
     next: session?.chart.filter(n => !n.resolved && n.hit > time).slice(0, 4).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit })) || [],
+    music: music.snapshot(),
     coordinates: `Canvas origin top-left. Notes emerge at center x, ${portrait ? 53.5 : 59}% height near the front-stage otter; targets at 84.5% height.`
   });
   window.advanceTime = ms => {
@@ -887,7 +895,11 @@
   const titleImageReady = $('title-logo').decode().then(() => { titleLogoLoaded = true; }).catch(() => {
     visible('title-logo', false); visible('title-fallback', true);
   });
-  Promise.all([...Object.keys(POSES).map(async name => {
+  music.setEnabled(audio.enabled);
+  const musicReady = music.prepare().then(loaded => {
+    if (!loaded) { visible('load-error', true); setText('load-error', '음악을 불러오지 못했어요. 새로고침해 주세요. 무음 플레이는 가능합니다.'); }
+  });
+  Promise.all([musicReady, ...Object.keys(POSES).map(async name => {
     const image = new Image(); image.src = assets[`character/otter-${name}.png`];
     await image.decode(); otterMaterials[name] = makeOtterMaterial(image);
   }), ...Object.keys(POSES).map(async name => {

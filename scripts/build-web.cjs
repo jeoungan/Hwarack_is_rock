@@ -24,7 +24,7 @@ function write(relative, data) {
   files.push(relative); size.push(Buffer.byteLength(data));
 }
 const pages = Object.fromEntries(['index.html', 'ranking.html'].map(name => [name, fs.readFileSync(path.join(root, name), 'utf8')]));
-for (const source of ['style.css', 'ranking.css', 'rhythm-core.js', 'asset-map.js', 'render-quality.js', 'record-config.js', 'firebase-client.js', 'leaderboard.js', 'ranking.js', 'game.js']) {
+for (const source of ['style.css', 'ranking.css', 'rhythm-core.js', 'music-track.js', 'music-player.js', 'asset-map.js', 'render-quality.js', 'record-config.js', 'firebase-client.js', 'leaderboard.js', 'ranking.js', 'game.js']) {
   const data = fs.readFileSync(path.join(root, source));
   const hash = crypto.createHash('sha256').update(data).digest('hex').slice(0, 12);
   const parsed = path.parse(source), output = `static/${parsed.name}.${hash}${parsed.ext}`;
