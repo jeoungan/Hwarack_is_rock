@@ -20,5 +20,9 @@ window.HwarakAssets = Object.freeze({
   "character/otter-DK.png": "assets/optimized/otter-DK.b61b564dfa45.webp",
   "character/otter-FJ.png": "assets/optimized/otter-FJ.6c07aece8c1a.webp",
   "character/skeleton-DK.png": "assets/optimized/skeleton-DK.8a2973cad6e4.webp",
-  "character/skeleton-FJ.png": "assets/optimized/skeleton-FJ.d0a88b63697d.webp"
+  "character/skeleton-FJ.png": "assets/optimized/skeleton-FJ.d0a88b63697d.webp",
+  "character/otter-DF.png": "assets/optimized/otter-DF.31da1bfeac46.webp",
+  "character/otter-JK.png": "assets/optimized/otter-JK.85324a135b1a.webp",
+  "character/skeleton-DF.png": "assets/optimized/skeleton-DF.68c840184f59.webp",
+  "character/skeleton-JK.png": "assets/optimized/skeleton-JK.bfc1e28cbfdf.webp"
 });

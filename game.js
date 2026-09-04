@@ -14,7 +14,8 @@
   const INTRO_DURATION = 3.5; // Three one-second Ready pumps, then half a second of Go.
   const HIT_LIGHT_DURATION = .78;
   const NOTE_WIDTH = .116;
-  const POSES = { normal: true, D: true, F: true, J: true, K: true, DK: true, FJ: true, DJ: true, FK: true };
+  const POSES = { normal: true, D: true, F: true, J: true, K: true, DK: true, FJ: true, DJ: true, FK: true, DF: true, JK: true };
+  const ENCORE_POSES = ['DF', 'JK', 'DF', 'JK', 'FJ'];
   const textures = {};
   const otterMaterials = {};
   const skeletonTextures = {};
@@ -30,7 +31,7 @@
   let openingPlayPending = false, revealTimer = null, titleLogoLoaded = false;
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
-  let intermissionElapsed = 0, phaseOneScore = 0;
+  let intermissionElapsed = 0, phaseOneScore = 0, encoreBeat = -1, titleElapsed = 0;
   let best = Math.max(0, Number(storeGet('hwarak-best-v2', '0')) || 0);
   const audio = { ctx: null, gain: null, enabled: storeGet('hwarak-sound', 'true') !== 'false', nextBeat: -7, nodes: new Set() };
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -143,17 +144,27 @@
     const head = Math.min(height * .145, width * (height > width ? .155 : .115), (feet - safeTop) / 2.75);
     return { x: width * .5, feet, head, figureHeight: head * 2.7 };
   }
+  function titleHeroLayout() {
+    const portrait = height > width;
+    const head = Math.min(height * .11, width * (portrait ? .095 : .052));
+    return { x: width * (portrait ? .5 : .20), feet: height * (portrait ? .94 : .79), head, figureHeight: head * 2.7 };
+  }
+  function displayPose() {
+    if (mode === 'title' || mode === 'revealing') return Math.floor(titleElapsed) % 2 ? 'JK' : 'DF';
+    if (session?.phase === 1 && (mode === 'intermission' || mode === 'result')) return ENCORE_POSES[Math.min(4, Math.floor(intermissionElapsed))];
+    return pose;
+  }
   function sideDancerLayout(t) {
     if (!session || (session.phase === 1 && t < C.PRACTICE)) return [];
     const hero = heroLayout(), figureHeight = hero.figureHeight * .79;
     const opacity = session.phase === 2 ? 1 : clamp((t - C.PRACTICE) / .7);
     return [.235, .765].map((x, index) => ({ x: width * x, feet: height * .615, figureHeight,
-      head: figureHeight * 52 / 432, opacity, pose, kind: 'skeleton', color: index ? '#fa68e0' : '#53f4ff' }));
+      head: figureHeight * 52 / 432, opacity, pose: displayPose(), kind: 'skeleton', color: index ? '#fa68e0' : '#53f4ff' }));
   }
   function drawSideDancers(t) {
-    const image = skeletonTextures[pose]; if (!image) return;
     const motion = beatMotion(t), impact = reducedMotion ? 0 : Math.max(0, 1 - (t - lastHitTime) / .2);
     for (const dancer of sideDancerLayout(t)) {
+      const image = skeletonTextures[dancer.pose]; if (!image) continue;
       const scale = dancer.figureHeight / 432, bounce = (motion.bounce * .065 + impact * .018) * dancer.figureHeight;
       ctx.save(); ctx.globalAlpha = dancer.opacity;
       bloom(dancer.x, dancer.feet, dancer.figureHeight * .44, dancer.color, .4 + motion.pulse * .25, .12);
@@ -239,15 +250,16 @@
       }
     }
   }
-  function drawCharacter(t) {
-    const material = otterMaterials[pose] || otterMaterials.normal; if (!material) return;
-    const { x, feet, head } = heroLayout(), scale = head / 128, motion = beatMotion(t);
+  function drawCharacter(t, shownPose = displayPose(), layout = heroLayout(), energy = 1) {
+    const material = otterMaterials[shownPose] || otterMaterials.normal; if (!material) return;
+    const { x, feet, head } = layout, scale = head / 128, motion = beatMotion(t);
     const impact = reducedMotion ? 0 : Math.max(0, 1 - (t - lastHitTime) / .2);
-    const bounce = motion.bounce * head * .14 + impact * head * .045;
+    const bounce = motion.bounce * head * .14 * energy + impact * head * .045;
     const squash = motion.squash * .065;
     bloom(x - head * .55, feet, head * 1.8, '#31eaff', .65 + motion.pulse * .2, .16);
     bloom(x + head * .6, feet, head * 1.5, '#ff42c8', .5 + motion.pulse * .2, .14);
     ctx.save(); ctx.translate(x, feet - bounce); ctx.scale(1 + squash, 1 - squash);
+    if (!reducedMotion && energy !== 1) ctx.rotate(Math.sin(t * Math.PI * 2) * .018 * energy);
     ctx.imageSmoothingEnabled = false;
     const w = 600 * scale, h = 512 * scale, left = -300 * scale, top = -470 * scale;
     const rim = Math.max(1.3, head * .023);
@@ -339,8 +351,9 @@
   function drawEffects(now) {
     fx = fx.filter(effect => now - effect.start < HIT_LIGHT_DURATION);
     for (const effect of fx) {
-      const elapsed = now - effect.start, age = clamp(elapsed / HIT_LIGHT_DURATION), p = target(effect.lane);
-      const color = COLORS[effect.lane], size = Math.max(35, width * .07), rise = height * .25;
+      const elapsed = now - effect.start, age = clamp(elapsed / HIT_LIGHT_DURATION);
+      const p = effect.position ? { x: effect.position.x * width, y: effect.position.y * height } : target(effect.lane);
+      const color = COLORS[effect.lane], size = Math.max(35, width * .07) * (effect.sizeFactor || 1), rise = height * (effect.riseFactor || .25);
       const fade = (1 - age) ** 1.5, flash = Math.exp(-elapsed * 14);
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       // A forceful contact flash stays on the line; fine particles carry the light upward.
@@ -394,9 +407,11 @@
     }
   }
   function render(now) {
-    const inGame = !!session, t = inGame ? Math.max(0, time) + intermissionElapsed : now;
+    const inGame = !!session, titleDance = mode === 'title' || mode === 'revealing';
+    const t = inGame ? Math.max(0, time) + intermissionElapsed : titleDance ? titleElapsed : now;
     drawBackdrop(t, false);
-    if (inGame) { drawSideDancers(t); cachedLayer('lanes', drawLaneLayer); drawCharacter(t); }
+    if (titleDance) drawCharacter(t * .5, displayPose(), titleHeroLayout(), .65);
+    if (inGame) { drawSideDancers(t); cachedLayer('lanes', drawLaneLayer); drawCharacter(t, displayPose(), heroLayout(), mode === 'intermission' ? 1.35 : 1); }
     if (inGame) {
       const notes = session ? session.visible(time) : [];
       drawJudgementLine(t, notes);
@@ -503,7 +518,7 @@
     openingVideo.pause(); clearTimeout(revealTimer);
     visible('title-impact', false);
     stopAudio(); clearInputs(); fx = []; feedback = null; phaseAnnounced = false;
-    intermissionElapsed = 0;
+    intermissionElapsed = 0; encoreBeat = -1;
     if (phase === 1) phaseOneScore = 0;
     time = -INTRO_DURATION; baseTime = -INTRO_DURATION; anchor = performance.now(); manual = false; pose = 'normal'; lastHitTime = -99;
     session = new C.Session(seed, onJudge, { phase }); audio.nextBeat = -7;
@@ -537,6 +552,7 @@
   }
   function finishOpening() {
     if (mode !== 'opening') return;
+    titleElapsed = 0;
     openingVideo.pause(); openingVideo.autoplay = false;
     visible('opening-recovery', false); setMode('revealing');
     $('title-screen').classList.add('is-entering');
@@ -576,10 +592,34 @@
     time = session.endTime; baseTime = time;
     stopAudio(); clearInputs(); visible('countdown', false);
     if (session.phase === 1) {
-      phaseOneScore = session.score; intermissionElapsed = 0; setMode('intermission');
-      $('game-status').textContent = '1페이즈 완료. 5초 뒤 점수와 도전하기 버튼이 나타납니다.';
+      phaseOneScore = session.score; intermissionElapsed = 0; encoreBeat = -1;
+      fx = []; feedback = null; setMode('intermission'); advanceEncore(0);
+      $('game-status').textContent = '1페이즈 완료! 다 함께 앙코르. 5초 뒤 점수와 도전하기 버튼이 나타납니다.';
     } else finishGame();
     updateHUD();
+  }
+  function advanceEncore(seconds) {
+    intermissionElapsed = Math.min(C.INTERMISSION, intermissionElapsed + seconds);
+    const lastBeat = Math.min(9, Math.floor(intermissionElapsed / C.BEAT));
+    // Skip expired bursts after a large test/frame jump; each beat emits only once.
+    for (let beat = Math.max(encoreBeat + 1, Math.ceil((intermissionElapsed - HIT_LIGHT_DURATION) / C.BEAT)); beat <= lastBeat; beat++) {
+      const finale = beat === 8, start = C.DURATION + beat * C.BEAT;
+      for (const [index, x] of [.235, .5, .765].entries()) {
+        const center = index === 1, effect = hitLight((index + beat) % 4, start, 70000 + beat * 3 + index);
+        effect.kind = 'encore'; effect.position = { x, y: .615 };
+        effect.sizeFactor = (center ? .6 : .38) * (finale ? 1.35 : 1);
+        effect.riseFactor = finale ? .2 : .13;
+        effect.motes.length = Math.min(effect.motes.length, finale ? center ? 110 : 68 : center ? 68 : 40);
+        fx.push(effect);
+      }
+      if (!manual && audio.enabled && audio.ctx?.state === 'running' && intermissionElapsed - beat * C.BEAT < .1) {
+        tone(audio.ctx.currentTime + .003, finale ? 660 : beat % 2 ? 330 : 440, .07, .16);
+      }
+    }
+    encoreBeat = lastBeat;
+    $('clear-cue').dataset.finale = String(intermissionElapsed >= 4);
+    setText('clear-message', intermissionElapsed >= 4 ? '다음 무대도, 락이다!' : '다 함께, 앙코르!');
+    if (intermissionElapsed >= C.INTERMISSION) finishGame();
   }
   function finishGame() {
     stopAudio(); clearInputs(); visible('countdown', false); setMode('result');
@@ -613,9 +653,10 @@
     setText('perfect-streak', session.perfectStreak >= C.BONUS_CHARGE ? `${session.perfectStreak}연속 · 다음 PERFECT +1` : `연속 ${session.perfectStreak} / ${C.BONUS_CHARGE}`);
     $('bonus-panel').classList.toggle('charged', session.perfectStreak >= C.BONUS_CHARGE);
     [...$('streak-dots').children].forEach((dot, index) => dot.classList.toggle('filled', index < session.perfectStreak));
-    setText('combo', session.combo ? `${session.combo} COMBO!` : elapsed < 2.5 ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
-    setText('phase-label', survival ? 'SURVIVAL' : practice ? 'WARM UP' : 'PHASE 1'); setText('phase-title', survival ? '2페이즈 도전' : practice ? '연습 무대' : '본무대');
-    setText('phase-detail', survival ? `실수 ${session.failures} / 5 · Special 이상!` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(30 - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
+    const encore = mode === 'intermission';
+    setText('combo', encore ? '끝까지 해냈다!' : session.combo ? `${session.combo} COMBO!` : elapsed < 2.5 ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
+    setText('phase-label', encore ? 'ENCORE' : survival ? 'SURVIVAL' : practice ? 'WARM UP' : 'PHASE 1'); setText('phase-title', encore ? '앙코르!' : survival ? '2페이즈 도전' : practice ? '연습 무대' : '본무대');
+    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `실수 ${session.failures} / 5 · Special 이상!` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(30 - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
     visible('survival-lives', survival);
     [...$('survival-lives').children].forEach((life, i) => life.classList.toggle('lost', i < session.failures));
     $('survival-lives').setAttribute('aria-label', `실수 ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
@@ -628,9 +669,9 @@
     if (!survival && !phaseAnnounced && elapsed >= 30) { phaseAnnounced = true; $('game-status').textContent = '본무대 시작. DK, FJ, DJ, FK 동시 노트가 함께 나오고 속도가 점점 빨라집니다.'; }
   }
   function update(now, delta) {
+    if (mode === 'title' || mode === 'revealing') titleElapsed += delta;
     if (mode === 'intermission' && !manual) {
-      intermissionElapsed = Math.min(C.INTERMISSION, intermissionElapsed + delta);
-      if (intermissionElapsed >= C.INTERMISSION) finishGame();
+      advanceEncore(delta);
     }
     if (mode === 'resuming') {
       resumeRemaining -= delta;
@@ -748,14 +789,19 @@
     title: { visible: !$('title-screen').hidden, logoLoaded: titleLogoLoaded, canStart: mode === 'title' && ready && $('rotate-notice').hidden },
     hero: heroLayout(), skeletonsLoaded: Object.keys(skeletonTextures).length,
     sideDancers: sideDancerLayout(Math.max(0, time)).map(d => ({ kind: d.kind, x: +d.x.toFixed(1), feet: +d.feet.toFixed(1), figureHeight: +d.figureHeight.toFixed(1), opacity: +d.opacity.toFixed(2), pose: d.pose })),
-    counts: session?.counts || {}, pose, held: session ? [...session.held].map(l => C.KEYS[l]) : [], seed: session?.seed,
+    counts: session?.counts || {}, pose: displayPose(), held: session ? [...session.held].map(l => C.KEYS[l]) : [], seed: session?.seed,
+    choreography: { title: mode === 'title' || mode === 'revealing', titleTime: +titleElapsed.toFixed(3),
+      titleHero: titleHeroLayout(), encore: mode === 'intermission', encoreTime: +intermissionElapsed.toFixed(3), beat: encoreBeat,
+      bursts: fx.filter(f => f.kind === 'encore' && C.DURATION + intermissionElapsed - f.start < HIT_LIGHT_DURATION).length },
     speed: +C.speedAt(Math.max(0, time), session?.phase || 1).toFixed(3),
     notes: session?.visible(time).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit, spawn: +n.spawn.toFixed(3), travel: +n.travel.toFixed(3), partial: Object.keys(n.inputs).map(l => C.KEYS[l]) })) || [],
     next: session?.chart.filter(n => !n.resolved && n.hit > time).slice(0, 4).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit })) || [],
     coordinates: 'Canvas origin top-left. Notes emerge at center x, 59% height near the front-stage otter; targets at 84.5% height.'
   });
   window.advanceTime = ms => {
-    if (!session || !Number.isFinite(ms) || ms < 0) return;
+    if (!Number.isFinite(ms) || ms < 0) return;
+    if (mode === 'title' || mode === 'revealing') { titleElapsed += ms / 1000; render(performance.now() / 1000); return; }
+    if (!session) return;
     if (!manual) { time = currentTime(); manual = true; stopAudio(); }
     if (mode === 'paused' || mode === 'result') return;
     let seconds = ms / 1000;
@@ -764,16 +810,12 @@
       if (resumeRemaining <= 0) setMode('playing');
     }
     if (mode === 'intermission') {
-      intermissionElapsed = Math.min(C.INTERMISSION, intermissionElapsed + seconds);
-      if (intermissionElapsed >= C.INTERMISSION) finishGame();
+      advanceEncore(seconds);
     } else if (mode === 'playing') {
       time += seconds; session.advance(time);
       if (session.finished) {
         const leftover = Math.max(0, time - session.endTime); endRound();
-        if (mode === 'intermission') {
-          intermissionElapsed = Math.min(C.INTERMISSION, leftover);
-          if (intermissionElapsed >= C.INTERMISSION) finishGame();
-        }
+        if (mode === 'intermission') advanceEncore(leftover);
       }
     }
     updateHUD(); render(performance.now() / 1000);
