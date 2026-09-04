@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+  <title>화락제도 락이다 · TOP 10 대시보드</title>
+  <link rel="stylesheet" href="ranking.css">
+  <script defer src="record-config.js"></script><script defer src="sheets-client.js"></script><script defer src="ranking.js"></script>
+</head>
+<body>
+  <main>
+    <header><div><p class="eyebrow">HWARAK LIVE · RECORD BOARD</p><h1>화락제도 <span>락이다</span></h1><p id="announcement">오늘 무대의 주인공들</p></div><span class="operator">TOP 10</span></header>
+    <section id="board" aria-label="참가자 순위">
+      <div class="board-bar"><div class="tabs" aria-label="순위 종류"><button data-phase="1" aria-pressed="true">1페이즈 · 점수</button><button data-phase="2" aria-pressed="false">2페이즈 · 생존</button></div></div>
+      <div class="card"><div class="table-heading"><div><h2 id="board-title">점수 TOP 10</h2><p id="rule">점수 → 정확도 순 · 상위 10개 기록</p></div><button id="refresh" class="quiet">새로고침 ↻</button></div>
+        <p id="board-status" role="status"></p><div class="table-wrap"><table><thead><tr><th scope="col">순위</th><th scope="col">이름</th><th scope="col">점수</th><th scope="col">등급</th><th scope="col">생존 시간</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <div id="empty" class="empty" hidden><span>✦</span><h3>아직 저장된 기록이 없어요</h3><p>참가자가 게임을 마치고 기록을 저장하면 여기에 나타납니다.</p></div>
+        <footer><span id="updated">아직 새로고침하지 않았습니다.</span><span id="interval">10초마다 자동 확인</span></footer>
+      </div>
+    </section>
+    <p class="footnote">이름은 첫 글자만 표시됩니다. 각 페이즈의 상위 10개 기록을 자동으로 갱신합니다.</p>
+  </main>
+</body></html>

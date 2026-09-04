@@ -481,6 +481,7 @@
     if (mask) pose = POSE_MASK[mask] || C.KEYS[lastLane];
   }
   function clearInputs() {
+    if (session && !session.finished) window.HwarakLeaderboard?.capture(2, -1, Math.max(0, time));
     for (const source of sources) source.clear();
     session?.clearHeld(); pads.forEach(pad => pad.dataset.down = 'false');
   }
@@ -489,7 +490,8 @@
     const first = sources[lane].size === 0;
     sources[lane].add(source); pads[lane].dataset.down = 'true'; lastLane = lane;
     if (first) {
-      time = currentTime(); session.press(lane, time); updatePose(); updateHUD();
+      time = currentTime(); window.HwarakLeaderboard?.capture(0, lane, time);
+      session.press(lane, time); updatePose(); updateHUD();
       if (session.finished) endRound();
       // Replace the accepted note with its light effect in the input event itself.
       render(performance.now() / 1000);
@@ -497,7 +499,10 @@
   }
   function release(lane, source) {
     sources[lane].delete(source);
-    if (!sources[lane].size) { session?.release(lane); pads[lane].dataset.down = 'false'; }
+    if (!sources[lane].size) {
+      if (session && !session.finished) window.HwarakLeaderboard?.capture(1, lane, Math.max(0, currentTime()));
+      session?.release(lane); pads[lane].dataset.down = 'false';
+    }
     // Releasing a key holds the last dance pose until a fresh input arrives.
   }
   function setMode(next) {
@@ -522,6 +527,7 @@
     if (phase === 1) phaseOneScore = 0;
     time = -INTRO_DURATION; baseTime = -INTRO_DURATION; anchor = performance.now(); manual = false; pose = 'normal'; lastHitTime = -99;
     session = new C.Session(seed, onJudge, { phase }); audio.nextBeat = -7;
+    window.HwarakLeaderboard?.begin(session.seed, phase);
     setMode('playing'); updateHUD();
     $('game-status').textContent = phase === 2 ? '2페이즈 도전. Special 이상으로 버티세요. 다섯 번째 실수에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
   }
@@ -529,6 +535,7 @@
     // A restored mobile tab can keep this entire JS session alive. Discard the
     // round before it is cached/hidden, instead of restoring a paused clock.
     if (!session) return;
+    window.HwarakLeaderboard?.abandon();
     stopAudio(); clearInputs(); session = null;
     time = baseTime = -INTRO_DURATION; anchor = lastFrame = performance.now();
     manual = false; resumeRemaining = 0; audio.nextBeat = -7;
@@ -640,6 +647,7 @@
     if (intermissionElapsed >= C.INTERMISSION) finishGame();
   }
   function finishGame() {
+    window.HwarakLeaderboard?.complete(session);
     stopAudio(); clearInputs(); visible('countdown', false); setMode('result');
     const survival = session.phase === 2;
     const accuracy = session.accuracy, grade = accuracy >= 95 ? 'S' : accuracy >= 85 ? 'A' : accuracy >= 70 ? 'B' : 'C';
@@ -740,6 +748,7 @@
     pad.addEventListener('click', event => { if (event.detail === 0) { press(lane, 'assistive'); setTimeout(() => release(lane, 'assistive'), 80); } });
   }
   window.addEventListener('keydown', event => {
+    if (window.HwarakLeaderboard?.isOpen() || event.target.closest?.('input, textarea, [contenteditable=true]')) return;
     const lane = CODE_TO_LANE[event.code];
     if (lane != null) { event.preventDefault(); if (!event.repeat) press(lane, event.code); return; }
     if (event.repeat) return;

@@ -23,16 +23,16 @@ function write(relative, data) {
   fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, data);
   files.push(relative); size.push(Buffer.byteLength(data));
 }
-let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-for (const source of ['style.css', 'rhythm-core.js', 'asset-map.js', 'render-quality.js', 'game.js']) {
+const pages = Object.fromEntries(['index.html', 'ranking.html'].map(name => [name, fs.readFileSync(path.join(root, name), 'utf8')]));
+for (const source of ['style.css', 'ranking.css', 'rhythm-core.js', 'asset-map.js', 'render-quality.js', 'record-config.js', 'sheets-client.js', 'leaderboard.js', 'ranking.js', 'game.js']) {
   const data = fs.readFileSync(path.join(root, source));
   const hash = crypto.createHash('sha256').update(data).digest('hex').slice(0, 12);
   const parsed = path.parse(source), output = `static/${parsed.name}.${hash}${parsed.ext}`;
-  write(output, data); html = html.replace(`"${source}"`, `"${output}"`);
+  write(output, data); for (const name of Object.keys(pages)) pages[name] = pages[name].replaceAll(`"${source}"`, `"${output}"`);
 }
 for (const asset of Object.values(context.window.HwarakAssets)) write(asset, fs.readFileSync(path.join(root, asset)));
 write('assets/kakao-share-20260904.jpg', fs.readFileSync(path.join(root, 'assets/kakao-share-20260904.jpg')));
-write('index.html', html);
+for (const [name, html] of Object.entries(pages)) write(name, html);
 // Cloudflare Pages-compatible headers; other hosts can apply the same policy.
 write('_headers', '/\n  Cache-Control: no-cache\n/index.html\n  Cache-Control: no-cache\n/assets/optimized/*\n  Cache-Control: public, max-age=31536000, immutable\n/static/*\n  Cache-Control: public, max-age=31536000, immutable\n');
 fs.mkdirSync(path.dirname(manifestPath), { recursive: true });

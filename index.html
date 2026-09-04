@@ -11,7 +11,7 @@
   <meta property="og:locale" content="ko_KR">
   <meta property="og:site_name" content="HWARAK LIVE">
   <meta property="og:title" content="화락제도 락이다">
-  <meta property="og:description" content="손끝으로 즐기는 축제 리듬 게임. 수달과 함께 2분 무대를 완주하고, 더 빠른 생존 무대에 도전하세요!">
+  <meta property="og:description" content="손끝으로 즐기는 축제 리듬 게임. 수달과 함께 2분 무대를 완주하고, 생존 도전과 참가자 순위에 도전하세요!">
   <meta property="og:url" content="https://jeoungan.github.io/Hwarack_is_rock/">
   <meta property="og:image" content="https://jeoungan.github.io/Hwarack_is_rock/assets/kakao-share-20260904.jpg">
   <meta property="og:image:secure_url" content="https://jeoungan.github.io/Hwarack_is_rock/assets/kakao-share-20260904.jpg">
@@ -28,6 +28,9 @@
   <script defer src="rhythm-core.js"></script>
   <script defer src="asset-map.js"></script>
   <script defer src="render-quality.js"></script>
+  <script defer src="record-config.js"></script>
+  <script defer src="sheets-client.js"></script>
+  <script defer src="leaderboard.js"></script>
   <script defer src="game.js"></script>
 </head>
 <body>
@@ -94,11 +97,22 @@
           <div id="result-counts" class="result-counts"></div><p id="combined-result" class="combined-result" hidden></p>
           <p id="challenge-rules" class="challenge-rules">2.0배속 출발 · Special 미만 누적 5회면 탈락</p>
           <div class="result-actions"><button id="challenge-button" class="primary">도전하기</button><button id="retry-button" class="secondary">처음부터 다시</button></div>
+          <div class="record-actions"><button id="record-button" class="ranking-link">기록 저장하기</button></div>
         </div>
       </section>
     </section>
     <footer class="footer"><span><i class="live-dot"></i> 화락제도 락이다</span><span>도착 지점에서 TAP! <span class="footer-separator">/</span> <kbd>ESC</kbd> 일시정지</span><span>PLAY LOUD. PLAY YOUR WAY.</span></footer>
   </main>
+  <dialog id="leaderboard-modal" class="leaderboard-modal" aria-labelledby="leaderboard-heading">
+    <div class="leaderboard-top"><div><span class="eyebrow">HWARAK LIVE</span><h2 id="leaderboard-heading">오늘의 기록 남기기</h2></div><button id="leaderboard-close" class="leaderboard-close" aria-label="기록 저장 닫기">×</button></div>
+    <form id="record-form" class="record-form">
+      <p id="record-summary"></p>
+      <label for="record-name">기록에 남길 이름 또는 별명</label>
+      <div class="record-input-row"><input id="record-name" name="name" type="text" maxlength="32" required autocomplete="off" placeholder="이름 또는 별명 · 1~16자"><button id="record-submit" type="submit">기록 저장하기</button></div>
+      <p class="record-notice">원하는 분만 저장해 주세요. 상위 기록의 점수·등급·생존 시간은 별도 대시보드에 표시되며, 이름은 첫 글자 뒤에 **로 가립니다. 전체 이름은 행사 운영자만 시트에서 확인합니다.</p>
+      <p id="record-status" class="record-status" role="status"></p>
+    </form>
+  </dialog>
   <div id="rotate-notice" class="rotate-notice" hidden><div class="rotate-phone" aria-hidden="true">↻</div><h2>가로로 돌리면<br>무대가 펼쳐져요</h2><p>휴대폰을 가로로 놓고<br>양손으로 네 개의 버튼을 눌러주세요.</p></div>
   <div class="sr-only" id="game-status" role="status" aria-live="polite"></div>
 </body>
