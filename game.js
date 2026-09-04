@@ -26,7 +26,7 @@
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const storeGet = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
   const storeSet = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
-  let width = 1400, height = 800, phone = false, ready = false, session = null;
+  let width = 1400, height = 800, phone = false, portrait = false, ready = false, session = null;
   let mode = 'opening', time = -INTRO_DURATION, baseTime = -INTRO_DURATION, anchor = 0, manual = false;
   let openingPlayPending = false, revealTimer = null, titleLogoLoaded = false;
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
@@ -45,8 +45,8 @@
     return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}${precise ? '.' + ticks % 10 : ''}`;
   };
   const target = lane => ({ x: width * (.155 + lane * .23), y: height * .845 });
-  const horizon = () => height * (phone ? .425 : .42);
-  const noteHorizon = () => height * .59;
+  const horizon = () => height * (portrait ? .38 : phone ? .425 : .42);
+  const noteHorizon = () => height * (portrait ? .535 : .59);
 
   function rect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.ceil(w), Math.ceil(h)); }
   function poly(points, color, stroke, line = 1, painter = ctx) {
@@ -69,7 +69,7 @@
     // The leading edge reaches the line at the hit time. Late-input grace never
     // carries the solid note below the line.
     const p = projection(lane, Math.min(1, u));
-    return { ...p, w: width * NOTE_WIDTH * p.scale, h: Math.max(2.3, height * .009 * p.scale) };
+    return { ...p, w: width * NOTE_WIDTH * p.scale, h: Math.max(2.3, Math.min(height * .009, width * .012) * p.scale) };
   }
 
 
@@ -139,14 +139,14 @@
     return { body: makeLayer(), cyan: makeLayer('#32efff'), pink: makeLayer('#ff4acb') };
   }
   function heroLayout() {
-    const feet = height * .615;
-    const safeTop = height * (phone ? .25 : .19);
+    const feet = height * (portrait ? .56 : .615);
+    const safeTop = portrait ? Math.max(150, height * .22) : height * (phone ? .25 : .19);
     const head = Math.min(height * .145, width * (height > width ? .155 : .115), (feet - safeTop) / 2.75);
     return { x: width * .5, feet, head, figureHeight: head * 2.7 };
   }
   function titleHeroLayout() {
     const portrait = height > width;
-    const head = Math.min(height * .11, width * (portrait ? .095 : .052));
+    const head = Math.min(height * (portrait && phone ? .062 : .11), width * (portrait ? .095 : .052));
     return { x: width * (portrait ? .5 : .20), feet: height * (portrait ? .94 : .79), head, figureHeight: head * 2.7 };
   }
   function displayPose() {
@@ -156,9 +156,10 @@
   }
   function sideDancerLayout(t) {
     if (!session || (session.phase === 1 && t < C.PRACTICE)) return [];
-    const hero = heroLayout(), figureHeight = hero.figureHeight * .79;
+    const hero = heroLayout(), figureHeight = hero.figureHeight * (portrait ? .65 : .79);
     const opacity = session.phase === 2 ? 1 : clamp((t - C.PRACTICE) / .7);
-    return [.235, .765].map((x, index) => ({ x: width * x, feet: height * .615, figureHeight,
+    const feet = portrait ? hero.feet - Math.max(height * .075, hero.figureHeight * .32) : hero.feet;
+    return [.235, .765].map((x, index) => ({ x: width * x, feet, figureHeight,
       head: figureHeight * 52 / 432, opacity, pose: displayPose(), kind: 'skeleton', color: index ? '#fa68e0' : '#53f4ff' }));
   }
   function drawSideDancers(t) {
@@ -486,7 +487,7 @@
     session?.clearHeld(); pads.forEach(pad => pad.dataset.down = 'false');
   }
   function press(lane, source) {
-    if (mode !== 'playing' || currentTime() < 0 || $('rotate-notice').hidden === false || sources[lane].has(source)) return;
+    if (mode !== 'playing' || currentTime() < 0 || sources[lane].has(source)) return;
     const first = sources[lane].size === 0;
     sources[lane].add(source); pads[lane].dataset.down = 'true'; lastLane = lane;
     if (first) {
@@ -519,7 +520,7 @@
     $('pause-button').disabled = mode !== 'playing' && mode !== 'resuming';
   }
   function startGame(seed = randomSeed(), phase = 1) {
-    if (!ready || !$('rotate-notice').hidden) return;
+    if (!ready) return;
     openingVideo.pause(); clearTimeout(revealTimer);
     visible('title-impact', false);
     stopAudio(); clearInputs(); fx = []; feedback = null; phaseAnnounced = false;
@@ -551,7 +552,7 @@
     render(performance.now() / 1000);
   }
   function syncOpeningPlayback() {
-    const allowed = mode === 'opening' && !document.hidden && $('rotate-notice').hidden;
+    const allowed = mode === 'opening' && !document.hidden;
     openingVideo.autoplay = allowed;
     if (!allowed) { openingVideo.pause(); return; }
     // A media error can arrive before the deferred game script attaches listeners.
@@ -563,7 +564,7 @@
     openingPlayPending = true;
     openingVideo.play().then(() => {
       visible('opening-recovery', false);
-      if (mode !== 'opening' || document.hidden || !$('rotate-notice').hidden) openingVideo.pause();
+      if (mode !== 'opening' || document.hidden) openingVideo.pause();
     }).catch(error => {
       if (error.name === 'AbortError' || mode !== 'opening') return;
       setText('opening-message', error.name === 'NotAllowedError' ? '영상을 재생하려면 눌러주세요.' : '영상을 재생하지 못했어요. 다시 재생하거나 시작 화면으로 이동할 수 있어요.');
@@ -599,7 +600,7 @@
     revealTimer = setTimeout(enterTitle, reducedMotion ? 500 : 1200);
   }
   function startFromTitle() {
-    if (mode !== 'title' || !ready || !$('rotate-notice').hidden) return;
+    if (mode !== 'title' || !ready) return;
     initAudio(); startGame();
   }
   function pauseGame(reason = '준비되면 다시 무대로 돌아가요.') {
@@ -609,7 +610,7 @@
     setText('pause-reason', reason); visible('countdown', false); setMode('paused');
   }
   function resumeGame() {
-    if (mode !== 'paused' || !$('rotate-notice').hidden) return;
+    if (mode !== 'paused') return;
     resumeRemaining = 1.5; setMode('resuming'); initAudio();
   }
   function endRound() {
@@ -708,7 +709,7 @@
   }
   function frame(now) {
     const deltaMs = now - lastFrame; lastFrame = now;
-    const active = !document.hidden && $('rotate-notice').hidden;
+    const active = !document.hidden;
     if (quality.observe(deltaMs, active && mode === 'playing' && !manual && time >= 0)) resize();
     if (active) {
       update(now, Math.min(.1, deltaMs / 1000));
@@ -718,7 +719,9 @@
     requestAnimationFrame(frame);
   }
   function resize() {
-    const bounds = stage.getBoundingClientRect(); width = bounds.width; height = bounds.height;
+    const bounds = canvas.getBoundingClientRect(), stageBounds = stage.getBoundingClientRect();
+    width = bounds.width; height = bounds.height;
+    portrait = height > width;
     const ratio = quality.ratio(width, height, window.devicePixelRatio);
     const pixelWidth = Math.round(width * ratio), pixelHeight = Math.round(height * ratio);
     if (canvas.width !== pixelWidth || canvas.height !== pixelHeight || renderRatio !== ratio) {
@@ -727,18 +730,22 @@
     }
     pads.forEach((pad, lane) => {
       const p = target(lane), w = width * .23, top = p.y - Math.max(16, height * .032);
-      Object.assign(pad.style, { left: `${p.x - w / 2}px`, top: `${top}px`, width: `${w}px`, height: `${height - top}px`, paddingTop: `${p.y - top}px`, '--lane-color': COLORS[lane] });
+      Object.assign(pad.style, { left: `${bounds.left - stageBounds.left + p.x - w / 2}px`, top: `${bounds.top - stageBounds.top + top}px`, width: `${w}px`, height: `${height - top}px`, paddingTop: `${p.y - top}px`, '--lane-color': COLORS[lane] });
     });
     render(performance.now() / 1000);
   }
   function checkOrientation() {
+    // A software keyboard changes viewport height without rotating the device.
+    if (document.activeElement?.matches('input, textarea, [contenteditable=true]')) return;
     const ua = navigator.userAgent;
     const tablet = /iPad|Tablet|SM-X|SM-T/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua)) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     phone = !tablet && (/iPhone|iPod|Android.*Mobile|Windows Phone/i.test(ua) || (!!navigator.userAgentData?.mobile) || (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600));
     document.body.dataset.phone = String(phone);
-    const blocked = phone && window.innerHeight > window.innerWidth;
-    visible('rotate-notice', blocked);
-    if (blocked) pauseGame('휴대폰을 가로로 돌린 뒤 계속할 수 있어요.');
+    const nextPortrait = String(window.innerHeight > window.innerWidth);
+    if (document.body.dataset.portrait && document.body.dataset.portrait !== nextPortrait) {
+      pauseGame('화면 방향이 바뀌어 잠시 멈췄어요. 준비되면 이 방향 그대로 이어서 플레이하세요.');
+    }
+    document.body.dataset.portrait = nextPortrait;
     syncOpeningPlayback();
     requestAnimationFrame(resize);
   }
@@ -811,11 +818,13 @@
   };
   document.addEventListener('pointerdown', unlockAudio, { passive: true });
   document.addEventListener('keydown', unlockAudio);
+  $('fullscreen').hidden = !stage.requestFullscreen || document.fullscreenEnabled === false;
   $('fullscreen').addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else if (stage.requestFullscreen) await stage.requestFullscreen(); } catch {} });
 
   // Readable state and deterministic time stepping for repeatable gameplay verification.
   window.render_game_to_text = () => JSON.stringify({
-    mode, ready, time: +time.toFixed(3), roundPhase: session?.phase || 1, phase: session?.phase === 2 ? 'survival' : time < 30 ? 'practice' : 'challenge', phone, rotateRequired: !$('rotate-notice').hidden,
+    mode, ready, time: +time.toFixed(3), roundPhase: session?.phase || 1, phase: session?.phase === 2 ? 'survival' : time < 30 ? 'practice' : 'challenge', phone, portrait, rotateRequired: false,
+    viewport: { width, height, noteHorizon: noteHorizon(), targets: [0, 1, 2, 3].map(target) },
     failures: session?.failures || 0, failureLimit: C.FAILURE_LIMIT, survivalTime: session?.phase === 2 ? +Math.max(0, time).toFixed(3) : null,
     phaseOneScore, combinedScore: session?.phase === 2 ? phaseOneScore + session.score : session?.score || 0,
     intermissionRemaining: mode === 'intermission' ? +(C.INTERMISSION - intermissionElapsed).toFixed(3) : 0,
@@ -826,7 +835,7 @@
     opening: mode === 'playing' ? openingCue(time) : null,
     introVideo: { time: +openingVideo.currentTime.toFixed(2), duration: Number.isFinite(openingVideo.duration) ? openingVideo.duration : null,
       paused: openingVideo.paused, muted: openingVideo.muted, ended: openingVideo.ended, error: openingVideo.error?.code || null },
-    title: { visible: !$('title-screen').hidden, logoLoaded: titleLogoLoaded, canStart: mode === 'title' && ready && $('rotate-notice').hidden },
+    title: { visible: !$('title-screen').hidden, logoLoaded: titleLogoLoaded, canStart: mode === 'title' && ready },
     hero: heroLayout(), skeletonsLoaded: Object.keys(skeletonTextures).length,
     sideDancers: sideDancerLayout(Math.max(0, time)).map(d => ({ kind: d.kind, x: +d.x.toFixed(1), feet: +d.feet.toFixed(1), figureHeight: +d.figureHeight.toFixed(1), opacity: +d.opacity.toFixed(2), pose: d.pose })),
     counts: session?.counts || {}, pose: displayPose(), held: session ? [...session.held].map(l => C.KEYS[l]) : [], seed: session?.seed,
@@ -836,7 +845,7 @@
     speed: +C.speedAt(Math.max(0, time), session?.phase || 1).toFixed(3),
     notes: session?.visible(time).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit, spawn: +n.spawn.toFixed(3), travel: +n.travel.toFixed(3), partial: Object.keys(n.inputs).map(l => C.KEYS[l]) })) || [],
     next: session?.chart.filter(n => !n.resolved && n.hit > time).slice(0, 4).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit })) || [],
-    coordinates: 'Canvas origin top-left. Notes emerge at center x, 59% height near the front-stage otter; targets at 84.5% height.'
+    coordinates: `Canvas origin top-left. Notes emerge at center x, ${portrait ? 53.5 : 59}% height near the front-stage otter; targets at 84.5% height.`
   });
   window.advanceTime = ms => {
     if (!Number.isFinite(ms) || ms < 0) return;
