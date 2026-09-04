@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100824">
+  <meta name="description" content="화락제의 주인공은 너! 음악 없이도 즐기는 원근형 4레인 리듬 게임.">
+  <title>화락제도 락이다 — HWARAK LIVE</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23fbe477'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='46'%3E★%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="rhythm-core.js"></script>
+  <script defer src="asset-map.js"></script>
+  <script defer src="render-quality.js"></script>
+  <script defer src="game.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><strong>HWARAK<span>LIVE</span></strong><span class="brand-caption">오늘 무대의 주인공, 너.</span></div>
+      <div class="tools">
+        <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="박자음 켜짐, 누르면 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">박자음 ON</span></button>
+        <button id="fullscreen" class="tool" aria-label="전체 화면">⛶ <span>전체 화면</span></button>
+      </div>
+    </header>
+
+    <section id="stage" class="stage" aria-label="화락제 리듬 게임 무대" data-mode="opening">
+      <canvas id="game-canvas" aria-label="캐릭터가 춤추는 축제 무대와 D F J K 네 개의 원근형 노트 경로"></canvas>
+      <section id="title-screen" class="title-screen overlay" aria-label="화락제도 락이다 시작 화면" hidden>
+        <h1 class="title-art"><img id="title-logo" src="assets/optimized/title-logo.49fa4a7f70eb.webp" alt="화락제도 락이다" draggable="false"><span id="title-fallback" hidden>화락제도<br><em>락이다</em></span></h1>
+        <div class="title-actions">
+          <button id="start-button" class="start-button" disabled><span id="start-label">무대 준비 중</span><span class="start-arrow" aria-hidden="true">↗</span></button>
+          <p class="title-key-hint">클릭 또는 <kbd>R</kbd> 키로 시작</p>
+        </div>
+      </section>
+      <section id="opening-screen" class="opening-screen overlay" aria-label="오프닝 영상">
+        <video id="opening-video" src="assets/optimized/opening.332aa5a62508.mp4" autoplay muted playsinline preload="auto" aria-label="수달의 화락제 오프닝 영상"></video>
+        <div class="opening-tools">
+          <button id="opening-sound" class="cinema-button" aria-pressed="false">♫ 소리 켜기</button>
+          <button id="opening-skip" class="cinema-button">건너뛰기 <span aria-hidden="true">↗</span></button>
+        </div>
+        <div id="opening-recovery" class="opening-recovery" hidden>
+          <p id="opening-message">영상을 재생하려면 눌러주세요.</p>
+          <button id="opening-play" class="cinema-button">영상 재생</button>
+          <button id="opening-continue" class="cinema-button">시작 화면으로</button>
+        </div>
+      </section>
+      <div id="title-impact" class="title-impact overlay" aria-hidden="true" hidden><div class="impact-bloom"></div><div class="impact-core"></div><div id="title-motes"></div></div>
+      <div id="hud" class="hud" hidden>
+        <div class="phase-panel"><span class="eyebrow" id="phase-label">WARM UP</span><strong id="phase-title">연습 무대</strong><span id="phase-detail">단일 노트로 감 잡기</span></div>
+        <div class="score-group">
+          <div class="score-panel"><span class="eyebrow">TOTAL SCORE</span><strong id="score">0000</strong><span id="combo">첫 박자를 기다리는 중</span></div>
+          <div class="bonus-panel" id="bonus-panel"><span class="eyebrow">PERFECT BONUS</span><strong id="bonus-score">+0</strong><div class="streak-dots" id="streak-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><span id="perfect-streak">연속 0 / 5</span></div>
+        </div>
+        <div class="time-panel"><div><span id="timer">02:00</span><button id="pause-button" aria-label="일시정지">Ⅱ</button></div><span id="speed">SPEED ×1.00</span></div>
+      </div>
+      <div id="round-progress" class="round-progress" hidden><div id="round-progress-fill"></div><span aria-hidden="true"></span></div>
+      <div id="beat-indicator" class="beat-indicator" aria-label="시각 박자 표시" hidden><i></i><i></i><i></i><i></i><span>120 BPM</span></div>
+      <div id="phase-announcement" class="phase-announcement" hidden><span>LET'S ROCK!</span><strong>이제 두 개씩!</strong><small>DF · JK · DJ · FK</small></div>
+      <div id="countdown" class="countdown" aria-live="polite" hidden><span id="countdown-word">Ready?</span></div>
+      <div id="key-pads" class="key-pads" hidden>
+        <button data-lane="0" class="key-pad" aria-label="D 왼쪽 다리"><b>D</b><span>왼쪽 다리</span></button>
+        <button data-lane="1" class="key-pad" aria-label="F 왼쪽 팔"><b>F</b><span>왼쪽 팔</span></button>
+        <button data-lane="2" class="key-pad" aria-label="J 오른쪽 팔"><b>J</b><span>오른쪽 팔</span></button>
+        <button data-lane="3" class="key-pad" aria-label="K 오른쪽 다리"><b>K</b><span>오른쪽 다리</span></button>
+      </div>
+      <p id="load-error" class="load-error" role="alert" hidden></p>
+
+      <section id="pause" class="overlay modal-overlay" hidden aria-label="일시정지">
+        <div class="dialog"><span class="eyebrow">TAKE A BREATH</span><h2>잠깐, 숨 고르기</h2><p id="pause-reason">준비되면 다시 무대로 돌아가요.</p><button id="resume-button" class="primary">계속 춤추기</button><button id="restart-pause" class="secondary">처음부터 다시</button></div>
+      </section>
+      <section id="result" class="overlay modal-overlay" hidden aria-label="공연 결과">
+        <div class="dialog result-dialog"><span class="eyebrow">THAT WAS YOUR STAGE</span><h2 id="result-title">오늘 무대, 찢었다!</h2><div class="result-grade" id="result-grade">A</div><div class="result-score" id="result-score">0</div><span class="score-caption" id="result-breakdown">기본 0 + Perfect 보너스 0</span><div class="result-stats"><div><b id="result-combo">0</b><span>최대 콤보</span></div><div><b id="result-accuracy">0%</b><span>정확도</span></div></div><div id="result-counts" class="result-counts"></div><button id="retry-button" class="primary">한 번 더 무대에!</button></div>
+      </section>
+    </section>
+    <footer class="footer"><span><i class="live-dot"></i> 화락제도 락이다</span><span>도착 지점에서 TAP! <span class="footer-separator">/</span> <kbd>ESC</kbd> 일시정지</span><span>PLAY LOUD. PLAY YOUR WAY.</span></footer>
+  </main>
+  <div id="rotate-notice" class="rotate-notice" hidden><div class="rotate-phone" aria-hidden="true">↻</div><h2>가로로 돌리면<br>무대가 펼쳐져요</h2><p>휴대폰을 가로로 놓고<br>양손으로 네 개의 버튼을 눌러주세요.</p></div>
+  <div class="sr-only" id="game-status" role="status" aria-live="polite"></div>
+</body>
+</html>

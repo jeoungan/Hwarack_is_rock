@@ -1,0 +1,15 @@
+{
+  "name": "hwarak-is-rock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "화락제도 락이다 — 4레인 축제 리듬 게임",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "build": "node scripts/build-web.cjs",
+    "preview": "node server.cjs --dist"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
