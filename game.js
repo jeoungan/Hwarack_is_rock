@@ -718,6 +718,9 @@
   }
   function resize() {
     const bounds = canvas.getBoundingClientRect(), stageBounds = stage.getBoundingClientRect();
+    // Navigation and mobile layout changes can briefly report a collapsed stage.
+    // Preserve the last valid backing canvas until measurable dimensions return.
+    if (bounds.width < 1 || bounds.height < 1) return;
     width = bounds.width; height = bounds.height;
     portrait = height > width;
     const ratio = quality.ratio(width, height, window.devicePixelRatio);
