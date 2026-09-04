@@ -525,6 +525,24 @@
     setMode('playing'); updateHUD();
     $('game-status').textContent = phase === 2 ? '2페이즈 도전. Special 이상으로 버티세요. 다섯 번째 실수에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
   }
+  function resetDepartedGame() {
+    // A restored mobile tab can keep this entire JS session alive. Discard the
+    // round before it is cached/hidden, instead of restoring a paused clock.
+    if (!session) return;
+    stopAudio(); clearInputs(); session = null;
+    time = baseTime = -INTRO_DURATION; anchor = lastFrame = performance.now();
+    manual = false; resumeRemaining = 0; audio.nextBeat = -7;
+    fx = []; feedback = null; phaseAnnounced = false;
+    intermissionElapsed = phaseOneScore = titleElapsed = 0; encoreBeat = -1;
+    pose = 'normal'; lastLane = 0; lastHitTime = -99;
+    openingVideo.pause(); openingVideo.autoplay = false; clearTimeout(revealTimer);
+    visible('title-impact', false); $('title-motes').replaceChildren();
+    $('opening-screen').classList.remove('is-leaving');
+    $('title-screen').classList.add('is-entering');
+    quality.reset(); setMode('title');
+    $('game-status').textContent = '새 무대가 준비됐어요. 시작하기 버튼이나 R 키로 시작하세요.';
+    render(performance.now() / 1000);
+  }
   function syncOpeningPlayback() {
     const allowed = mode === 'opening' && !document.hidden && $('rotate-notice').hidden;
     openingVideo.autoplay = allowed;
@@ -731,7 +749,20 @@
   });
   window.addEventListener('keyup', event => { const lane = CODE_TO_LANE[event.code]; if (lane != null) release(lane, event.code); });
   window.addEventListener('blur', () => pauseGame('화면을 벗어나 잠시 멈췄어요. 준비되면 이어서 플레이하세요.'));
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame('화면을 벗어나 잠시 멈췄어요.'); syncOpeningPlayback(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (phone) resetDepartedGame();
+      else pauseGame('화면을 벗어나 잠시 멈췄어요.');
+    }
+    syncOpeningPlayback();
+  });
+  // pagehide covers navigation/back-forward cache; visibilitychange also covers
+  // mobile app switching, where pagehide is not guaranteed to run.
+  window.addEventListener('pagehide', resetDepartedGame);
+  window.addEventListener('pageshow', event => {
+    if (event.persisted) resetDepartedGame();
+    lastFrame = performance.now(); syncOpeningPlayback();
+  });
   window.addEventListener('resize', checkOrientation); document.addEventListener('fullscreenchange', resize);
   $('start-button').addEventListener('click', startFromTitle);
   openingVideo.addEventListener('ended', finishOpening);
