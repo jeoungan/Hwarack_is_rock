@@ -29,7 +29,7 @@
   <script defer src="asset-map.js"></script>
   <script defer src="render-quality.js"></script>
   <script defer src="record-config.js"></script>
-  <script defer src="sheets-client.js"></script>
+  <script defer src="firebase-client.js"></script>
   <script defer src="leaderboard.js"></script>
   <script defer src="game.js"></script>
 </head>
@@ -110,7 +110,7 @@
       <p id="record-summary"></p>
       <label for="record-name">기록에 남길 이름 또는 별명</label>
       <div class="record-input-row"><input id="record-name" name="name" type="text" maxlength="32" required autocomplete="off" placeholder="이름 또는 별명 · 1~16자"><button id="record-submit" type="submit">기록 저장하기</button></div>
-      <p class="record-notice">원하는 분만 저장해 주세요. 상위 기록의 점수·등급·생존 시간은 별도 대시보드에 표시되며, 이름은 첫 글자 뒤에 **로 가립니다. 전체 이름은 행사 운영자만 시트에서 확인합니다.</p>
+      <p class="record-notice">원하는 분만 저장해 주세요. 상위 기록의 점수·등급·생존 시간은 별도 대시보드에 표시되며, 이름은 첫 글자 뒤에 **로 가립니다. 전체 이름은 행사 운영자만 Firebase 관리 화면에서 확인합니다.</p>
       <p id="record-status" class="record-status" role="status"></p>
     </form>
   </dialog>

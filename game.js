@@ -482,7 +482,6 @@
     if (mask) pose = POSE_MASK[mask] || C.KEYS[lastLane];
   }
   function clearInputs() {
-    if (session && !session.finished) window.HwarakLeaderboard?.capture(2, -1, Math.max(0, time));
     for (const source of sources) source.clear();
     session?.clearHeld(); pads.forEach(pad => pad.dataset.down = 'false');
   }
@@ -491,7 +490,7 @@
     const first = sources[lane].size === 0;
     sources[lane].add(source); pads[lane].dataset.down = 'true'; lastLane = lane;
     if (first) {
-      time = currentTime(); window.HwarakLeaderboard?.capture(0, lane, time);
+      time = currentTime();
       session.press(lane, time); updatePose(); updateHUD();
       if (session.finished) endRound();
       // Replace the accepted note with its light effect in the input event itself.
@@ -501,7 +500,6 @@
   function release(lane, source) {
     sources[lane].delete(source);
     if (!sources[lane].size) {
-      if (session && !session.finished) window.HwarakLeaderboard?.capture(1, lane, Math.max(0, currentTime()));
       session?.release(lane); pads[lane].dataset.down = 'false';
     }
     // Releasing a key holds the last dance pose until a fresh input arrives.

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
-  let phase = 1, loading = false, timer = null, interval = 10, generation = 0, loaded = false;
+  let phase = 1, loading = false, timer = null, interval = 30, generation = 0, loaded = false;
   const clock = value => { const tenth = Math.floor(value * 10 + 1e-6); return `${Math.floor(tenth / 600)}:${(tenth % 600 / 10).toFixed(1).padStart(4, '0')}`; };
   function schedule() { clearTimeout(timer); if (!document.hidden) timer = setTimeout(load, interval * 1000); }
   async function load() {
@@ -12,7 +12,7 @@
       const data = await window.HwarakRecords.request('ranking', { phase: selected });
       if (version !== generation) return;
       $('board-status').textContent = ''; loaded = true;
-      $('announcement').textContent = data.announcement || '오늘 무대의 주인공들'; interval = data.refreshSeconds || 10;
+      $('announcement').textContent = data.announcement || '오늘 무대의 주인공들'; interval = data.refreshSeconds || 30;
       const rows = document.createDocumentFragment();
       for (const entry of data.entries.slice(0, 10)) {
         const row = document.createElement('tr');

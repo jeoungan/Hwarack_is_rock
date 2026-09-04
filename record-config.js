@@ -1,2 +1,7 @@
-// Public deployment URL only. Sheet identifiers and signing secrets stay on the server.
-window.HwarakRecordConfig = Object.freeze({ endpoint: 'https://script.google.com/macros/s/AKfycbyg5-_jQdm3bCjFyIUCAD4_tKMWjKwi4oVERVSV70WXhJWTattXU6wraS8Ah9JMVZRj/exec' });
+// Public Firebase web configuration. Access is controlled by Firestore rules.
+window.HwarakRecordConfig = Object.freeze({ firebase: {
+  apiKey: 'AIzaSyDVwnAMFiMN9JlrvVifmeMtbcjWT75yA2I',
+  authDomain: 'hwarak-records.firebaseapp.com', projectId: 'hwarak-records',
+  storageBucket: 'hwarak-records.firebasestorage.app', messagingSenderId: '382147354669',
+  appId: '1:382147354669:web:ed0eaed7f14fe986ff58a4'
+} });

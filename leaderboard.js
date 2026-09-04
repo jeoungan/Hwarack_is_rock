@@ -8,18 +8,18 @@
   function abandon() { close(); round = null; }
   function begin(seed, phase) {
     close();
-    const current = round = { events: [], phase, result: null, saved: null, pending: false, overflow: false };
+    const current = round = { phase, result: null, saved: null, pending: false };
     $('record-button').textContent = '기록 저장하기'; $('record-name').value = '';
-    current.ticket = window.HwarakRecords.request('begin', { seed: seed >>> 0, phase })
+    current.ticket = Promise.resolve().then(() => {
+      if (!window.HwarakRecords) throw new Error('기록 서버 파일을 불러오지 못했어요.');
+      return window.HwarakRecords.request('begin', { seed: seed >>> 0, phase });
+    })
       .then(data => data.ticket).catch(error => { current.ticketError = error.message; return null; });
   }
-  function capture(type, lane, time) {
-    if (!round || round.result || time < 0 || !Number.isFinite(time)) return;
-    if (round.events.length >= 60000) { round.overflow = true; return; }
-    round.events.push([type, lane, Math.max(time, round.events.at(-1)?.[2] || 0)]);
-  }
   function complete(session) {
-    if (round && !round.result) round.result = { score: session.score, time: session.endTime, phase: session.phase };
+    if (round && !round.result) round.result = { score: session.score, time: session.endTime, phase: session.phase,
+      accuracy: +session.accuracy.toFixed(1), grade: session.accuracy >= 95 ? 'S' : session.accuracy >= 85 ? 'A' : session.accuracy >= 70 ? 'B' : 'C',
+      counts: { ...session.counts }, bonus: session.bonusScore, maxCombo: session.maxCombo };
   }
   function open() {
     if (!round?.result) return;
@@ -35,12 +35,11 @@
     if (!current?.result || current.pending || current.saved) return;
     const name = $('record-name').value.normalize('NFKC').trim().replace(/\s+/gu, ' ');
     if ([...name].length < 1 || [...name].length > 16 || !/^[\p{L}\p{N}\p{M} ._\-]+$/u.test(name)) { $('record-status').textContent = '이름은 한글·영문·숫자 등 1~16자로 입력해 주세요.'; return; }
-    if (current.overflow) { $('record-status').textContent = '입력 기록이 너무 길어 저장할 수 없어요.'; return; }
     current.pending = true; $('record-submit').disabled = $('record-name').disabled = true; $('record-status').textContent = '기록을 확인하고 저장하는 중…';
     try {
       const ticket = await current.ticket;
       if (!ticket) throw new Error((current.ticketError || '시작 기록을 확인하지 못했어요.') + ' 인터넷 연결 후 새 게임에서 다시 도전해 주세요.');
-      const data = await window.HwarakRecords.request('save', { ticket, name, events: current.events, endTime: current.result.time });
+      const data = await window.HwarakRecords.request('save', { ticket, name, result: current.result });
       current.saved = data.entry;
       if (round !== current) return;
       $('record-button').textContent = '기록 저장 완료'; $('record-submit').textContent = '저장 완료';
@@ -50,5 +49,5 @@
   });
   $('record-button').addEventListener('click', open); $('leaderboard-close').addEventListener('click', close);
   modal.addEventListener('close', () => returnFocus?.focus?.({ preventScroll: true }));
-  window.HwarakLeaderboard = { begin, capture, complete, abandon, isOpen: () => modal.open };
+  window.HwarakLeaderboard = { begin, complete, abandon, isOpen: () => modal.open };
 })();
