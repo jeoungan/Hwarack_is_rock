@@ -12,13 +12,13 @@ window.HwarakAssets = Object.freeze({
   "character/skeleton-J.png": "assets/optimized/skeleton-J.28e8b1136728.webp",
   "character/otter-K.png": "assets/optimized/otter-K.0b0462cddd38.webp",
   "character/skeleton-K.png": "assets/optimized/skeleton-K.0a974c32b13f.webp",
-  "character/otter-DF.png": "assets/optimized/otter-DF.31da1bfeac46.webp",
-  "character/skeleton-DF.png": "assets/optimized/skeleton-DF.68c840184f59.webp",
-  "character/otter-JK.png": "assets/optimized/otter-JK.85324a135b1a.webp",
-  "character/skeleton-JK.png": "assets/optimized/skeleton-JK.bfc1e28cbfdf.webp",
   "character/otter-DJ.png": "assets/optimized/otter-DJ.1adb88633a92.webp",
   "character/skeleton-DJ.png": "assets/optimized/skeleton-DJ.e1b3332a4487.webp",
   "character/otter-FK.png": "assets/optimized/otter-FK.8eaad5881971.webp",
   "character/skeleton-FK.png": "assets/optimized/skeleton-FK.87dc689f2bb8.webp",
-  "assets/opening.mp4": "assets/optimized/opening.332aa5a62508.mp4"
+  "assets/opening.mp4": "assets/optimized/opening.332aa5a62508.mp4",
+  "character/otter-DK.png": "assets/optimized/otter-DK.b61b564dfa45.webp",
+  "character/otter-FJ.png": "assets/optimized/otter-FJ.6c07aece8c1a.webp",
+  "character/skeleton-DK.png": "assets/optimized/skeleton-DK.8a2973cad6e4.webp",
+  "character/skeleton-FJ.png": "assets/optimized/skeleton-FJ.d0a88b63697d.webp"
 });

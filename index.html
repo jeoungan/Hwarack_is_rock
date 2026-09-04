@@ -46,16 +46,17 @@
       </section>
       <div id="title-impact" class="title-impact overlay" aria-hidden="true" hidden><div class="impact-bloom"></div><div class="impact-core"></div><div id="title-motes"></div></div>
       <div id="hud" class="hud" hidden>
-        <div class="phase-panel"><span class="eyebrow" id="phase-label">WARM UP</span><strong id="phase-title">연습 무대</strong><span id="phase-detail">단일 노트로 감 잡기</span></div>
+        <div class="phase-panel"><span class="eyebrow" id="phase-label">WARM UP</span><strong id="phase-title">연습 무대</strong><span id="phase-detail">단일 노트로 감 잡기</span><div id="survival-lives" class="survival-lives" hidden><i></i><i></i><i></i><i></i><i></i></div></div>
         <div class="score-group">
-          <div class="score-panel"><span class="eyebrow">TOTAL SCORE</span><strong id="score">0000</strong><span id="combo">첫 박자를 기다리는 중</span></div>
+          <div class="score-panel"><span class="eyebrow" id="score-label">TOTAL SCORE</span><strong id="score">0000</strong><span id="combo">첫 박자를 기다리는 중</span></div>
           <div class="bonus-panel" id="bonus-panel"><span class="eyebrow">PERFECT BONUS</span><strong id="bonus-score">+0</strong><div class="streak-dots" id="streak-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><span id="perfect-streak">연속 0 / 5</span></div>
         </div>
-        <div class="time-panel"><div><span id="timer">02:00</span><button id="pause-button" aria-label="일시정지">Ⅱ</button></div><span id="speed">SPEED ×1.00</span></div>
+        <div class="time-panel"><span id="timer-label" class="timer-label">남은 시간</span><div><span id="timer">02:00</span><button id="pause-button" aria-label="일시정지">Ⅱ</button></div><span id="speed">SPEED ×1.00</span></div>
       </div>
       <div id="round-progress" class="round-progress" hidden><div id="round-progress-fill"></div><span aria-hidden="true"></span></div>
       <div id="beat-indicator" class="beat-indicator" aria-label="시각 박자 표시" hidden><i></i><i></i><i></i><i></i><span>120 BPM</span></div>
-      <div id="phase-announcement" class="phase-announcement" hidden><span>LET'S ROCK!</span><strong>이제 두 개씩!</strong><small>DF · JK · DJ · FK</small></div>
+      <div id="phase-announcement" class="phase-announcement" hidden><span>LET'S ROCK!</span><strong>이제 두 개씩!</strong><small>DK · FJ · DJ · FK</small></div>
+      <div id="clear-cue" class="clear-cue" hidden><span>PHASE 1 CLEAR</span><strong>무대를 끝까지 지켰다!</strong></div>
       <div id="countdown" class="countdown" aria-live="polite" hidden><span id="countdown-word">Ready?</span></div>
       <div id="key-pads" class="key-pads" hidden>
         <button data-lane="0" class="key-pad" aria-label="D 왼쪽 다리"><b>D</b><span>왼쪽 다리</span></button>
@@ -69,7 +70,14 @@
         <div class="dialog"><span class="eyebrow">TAKE A BREATH</span><h2>잠깐, 숨 고르기</h2><p id="pause-reason">준비되면 다시 무대로 돌아가요.</p><button id="resume-button" class="primary">계속 춤추기</button><button id="restart-pause" class="secondary">처음부터 다시</button></div>
       </section>
       <section id="result" class="overlay modal-overlay" hidden aria-label="공연 결과">
-        <div class="dialog result-dialog"><span class="eyebrow">THAT WAS YOUR STAGE</span><h2 id="result-title">오늘 무대, 찢었다!</h2><div class="result-grade" id="result-grade">A</div><div class="result-score" id="result-score">0</div><span class="score-caption" id="result-breakdown">기본 0 + Perfect 보너스 0</span><div class="result-stats"><div><b id="result-combo">0</b><span>최대 콤보</span></div><div><b id="result-accuracy">0%</b><span>정확도</span></div></div><div id="result-counts" class="result-counts"></div><button id="retry-button" class="primary">한 번 더 무대에!</button></div>
+        <div class="dialog phase-result">
+          <span class="eyebrow" id="result-eyebrow">READY FOR THE NEXT STAGE?</span><h2 id="result-title">1페이즈 클리어!</h2>
+          <div class="result-main"><div><span id="result-score-label" class="metric-label">1페이즈 점수</span><div class="result-score" id="result-score">0</div><span class="score-caption" id="result-breakdown">기본 0 + Perfect 보너스 0</span></div><div class="result-grade" id="result-grade">A</div><div id="survival-result" hidden><span class="metric-label">버틴 시간</span><strong id="result-survival-time">00:00.0</strong></div></div>
+          <div class="result-stats"><div><b id="result-combo">0</b><span>최대 콤보</span></div><div><b id="result-accuracy">0%</b><span>정확도</span></div></div>
+          <div id="result-counts" class="result-counts"></div><p id="combined-result" class="combined-result" hidden></p>
+          <p id="challenge-rules" class="challenge-rules">2.0배속 출발 · Special 미만 누적 5회면 탈락</p>
+          <div class="result-actions"><button id="challenge-button" class="primary">도전하기</button><button id="retry-button" class="secondary">처음부터 다시</button></div>
+        </div>
       </section>
     </section>
     <footer class="footer"><span><i class="live-dot"></i> 화락제도 락이다</span><span>도착 지점에서 TAP! <span class="footer-separator">/</span> <kbd>ESC</kbd> 일시정지</span><span>PLAY LOUD. PLAY YOUR WAY.</span></footer>

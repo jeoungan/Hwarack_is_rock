@@ -15,7 +15,9 @@
   const WINDOWS = [['perfect', PERFECT], ['special', SPECIAL], ['great', GREAT], ['good', GOOD]];
   const BONUS_CHARGE = 5;
   const CHORD_GAP = 0.10;
-  const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3]];
+  const FAILURE_LIMIT = 5;
+  const INTERMISSION = 5;
+  const PAIRS = [[0, 3], [1, 2], [0, 2], [1, 3]];
   const KEYS = ['D', 'F', 'J', 'K'];
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 
@@ -37,36 +39,44 @@
     }
     return result;
   }
-  function travelAt(time) {
-    return 2.4 - 1.5 * Math.pow(clamp((time - PRACTICE) / (DURATION - PRACTICE)), 0.85);
+  function speedAt(time, phase = 1) {
+    return phase === 2 ? 2 + Math.max(0, time) / 60 : 1 + clamp((time - PRACTICE) / (DURATION - PRACTICE));
   }
-  function createChart(seed) {
+  function travelAt(time, phase = 1) { return 2.4 / speedAt(time, phase); }
+  function noteGenerator(seed, phase) {
     const rng = random(seed);
-    let singles = [], pairs = [], id = 0, challengeCount = 0;
-    const chart = [];
+    let singles = [], pairs = [], id = 0, challengeCount = 0, hit = 2.5;
     const nextSingle = () => {
       if (!singles.length) singles = shuffle([0, 1, 2, 3], rng);
       return [singles.pop()];
     };
-    for (let hit = 2.5; hit < DURATION; hit += hit < 31.5 ? 1 : BEAT) {
-      const travel = travelAt(hit);
+    return () => {
+      const travel = travelAt(hit, phase);
       const spawn = hit - travel;
       let lanes = nextSingle();
-      if (spawn >= PRACTICE) {
-        const chance = 0.24 + 0.30 * clamp((hit - PRACTICE) / 90);
+      if (phase === 2 || spawn >= PRACTICE) {
+        const chance = phase === 2 ? .54 : 0.24 + 0.30 * clamp((hit - PRACTICE) / 90);
         if (challengeCount++ === 0 || rng() < chance) {
           if (!pairs.length) pairs = shuffle(PAIRS, rng);
           lanes = pairs.pop().slice();
         }
       }
-      chart.push({ id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {} });
-    }
+      const note = { id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {} };
+      hit += phase === 2 || hit >= 31.5 ? BEAT : 1;
+      return note;
+    };
+  }
+  function createChart(seed) {
+    const next = noteGenerator(seed, 1), chart = [];
+    for (let note = next(); note.hit < DURATION; note = next()) chart.push(note);
     return chart;
   }
   class Session {
-    constructor(seed, onJudge = () => {}) {
+    constructor(seed, onJudge = () => {}, options = {}) {
       this.seed = seed >>> 0;
-      this.chart = createChart(this.seed);
+      this.phase = options.phase === 2 ? 2 : 1;
+      this.nextNote = this.phase === 2 ? noteGenerator(this.seed, 2) : null;
+      this.chart = this.phase === 2 ? [] : createChart(this.seed);
       this.onJudge = onJudge;
       this.time = -3;
       this.held = new Set();
@@ -79,16 +89,41 @@
       this.maxCombo = 0;
       this.counts = { perfect: 0, special: 0, great: 0, good: 0, miss: 0, stray: 0 };
       this.finished = false;
+      this.failures = 0;
+      this.endTime = null;
+      this.endReason = null;
+      if (this.phase === 2) this.fillAhead(0);
+    }
+    fillAhead(time) {
+      // A rolling buffer keeps an open-ended round small even after many minutes.
+      while (!this.chart.length || this.chart.at(-1).hit < time + 3) this.chart.push(this.nextNote());
     }
     advance(time) {
+      if (this.finished) return;
+      if (this.phase === 2) {
+        // Resolve overdue notes in chronological order. A long frame or test jump
+        // ends exactly at the fifth failure, never at the later polling time.
+        while (!this.finished) {
+          let note = this.chart.find(n => !n.resolved);
+          if (!note) { note = this.nextNote(); this.chart.push(note); }
+          if (time <= note.hit + GOOD + 1e-9) break;
+          this.time = note.hit + GOOD;
+          this.resolve(note, 'miss', null);
+        }
+        if (!this.finished) {
+          this.time = time; this.fillAhead(time);
+          this.chart = this.chart.filter(n => !n.resolved || n.hit >= time - 2);
+        }
+        return;
+      }
       this.time = time;
       for (const note of this.chart) {
         if (!note.resolved && time > note.hit + GOOD + 1e-9) this.resolve(note, 'miss', null);
       }
-      if (time >= DURATION) this.finished = true;
+      if (time + 1e-9 >= DURATION) { this.finished = true; this.time = this.endTime = DURATION; this.endReason = 'clear'; }
     }
     resolve(note, judgement, delta) {
-      if (note.resolved) return;
+      if (note.resolved || this.finished) return;
       note.resolved = true;
       note.judgement = judgement;
       // One displayed judgement is one scoring/streak event, including a two-key chord.
@@ -108,13 +143,20 @@
         this.combo++;
         this.maxCombo = Math.max(this.combo, this.maxCombo);
       }
+      if (this.phase === 2 && POINTS[judgement] < POINTS.special) {
+        this.failures++;
+        if (this.failures >= FAILURE_LIMIT) {
+          this.finished = true; this.endTime = Math.max(0, this.time); this.endReason = 'eliminated';
+        }
+      }
       this.onJudge({ judgement, lanes: note.lanes, delta, noteId: note.id, points, bonus });
     }
     press(lane, time) {
-      if (this.held.has(lane)) return;
+      if (this.finished || this.held.has(lane)) return;
       this.held.add(lane);
       if (time < 0 || this.finished) return;
       this.advance(time);
+      if (this.finished) return;
       const note = this.chart.filter(n => !n.resolved && n.lanes.includes(lane) && Math.abs(n.hit - time) <= GOOD + 1e-9)
         .sort((a, b) => Math.abs(a.hit - time) - Math.abs(b.hit - time))[0];
       if (!note) {
@@ -146,8 +188,9 @@
       return total ? 100 * (perfect + special * .8 + great * .6 + good * .4) / total : 100;
     }
     visible(time = this.time) {
+      if (this.finished) return [];
       return this.chart.filter(n => !n.resolved && time >= n.spawn && time <= n.hit + GOOD);
     }
   }
-  return { DURATION, PRACTICE, BEAT, PERFECT, SPECIAL, GREAT, GOOD, POINTS, BONUS_CHARGE, CHORD_GAP, PAIRS, KEYS, travelAt, createChart, Session };
+  return { DURATION, PRACTICE, BEAT, PERFECT, SPECIAL, GREAT, GOOD, POINTS, BONUS_CHARGE, CHORD_GAP, FAILURE_LIMIT, INTERMISSION, PAIRS, KEYS, speedAt, travelAt, createChart, Session };
 });

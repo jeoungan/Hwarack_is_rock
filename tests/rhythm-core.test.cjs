@@ -15,7 +15,7 @@ test('100 random charts preserve the practice boundary, beat grid, supported cho
       assert.ok(chart[i].hit > chart[i - 1].hit);
       assert.ok(chart[i].travel <= chart[i - 1].travel);
     }
-    assert.ok(chart.at(-1).travel < 1);
+    assert.ok(chart.at(-1).travel >= 1.2 && chart.at(-1).travel < 1.21);
   }
 });
 test('same seed reproduces a chart; a new seed changes it', () => {
@@ -110,4 +110,60 @@ test('a fully Perfect round has exactly chart.length - 5 bonus points including 
   const s = new C.Session(42); for (const n of s.chart) hit(s, n); s.advance(120);
   assert.equal(s.counts.perfect, s.chart.length); assert.equal(s.bonusScore, s.chart.length - 5);
   assert.equal(s.score, s.chart.length * 6 - 5); assert.equal(s.accuracy, 100);
+});
+
+test('all chords cross the two hands and phase-one speed reaches exactly 2x at 120 seconds', () => {
+  assert.deepEqual(C.PAIRS, [[0, 3], [1, 2], [0, 2], [1, 3]]);
+  for (const [time, speed] of [[0, 1], [30, 1], [75, 1.5], [120, 2], [200, 2]]) assert.equal(C.speedAt(time), speed);
+  for (const [time, speed] of [[0, 2], [30, 2.5], [60, 3], [120, 4], [600, 12]]) assert.equal(C.speedAt(time, 2), speed);
+});
+
+test('survival counts Great/Good/Miss cumulatively; Perfect/Special do not restore lives', () => {
+  const s = new C.Session(42, () => {}, { phase: 2 });
+  const offsets = [.10, .06, .14, 0, .17, .08, .10, .14];
+  let failures = 0;
+  for (const offset of offsets) {
+    const n = s.chart.find(n => !n.resolved);
+    if (offset > C.GOOD) s.advance(n.hit + offset); else hit(s, n, offset);
+    if (offset > C.SPECIAL) failures++;
+    assert.equal(s.failures, failures);
+    assert.equal(s.finished, failures === 5);
+  }
+  assert.equal(s.endReason, 'eliminated');
+  assert.equal(s.counts.great, 2); assert.equal(s.counts.good, 2); assert.equal(s.counts.miss, 1);
+  const frozen = { score: s.score, endTime: s.endTime, counts: { ...s.counts } };
+  s.advance(600); s.press(0, 601); s.resolve(s.chart.find(n => !n.resolved), 'perfect', 0);
+  assert.deepEqual({ score: s.score, endTime: s.endTime, counts: s.counts }, frozen);
+  assert.deepEqual(s.visible(), []);
+});
+
+test('a failed two-key chord consumes one life; late input cannot score after the fifth missed note', () => {
+  const s = new C.Session(3, () => {}, { phase: 2 });
+  const chord = s.chart[0]; assert.equal(chord.lanes.length, 2);
+  s.press(chord.lanes[0], chord.hit); s.release(chord.lanes[0]); s.advance(chord.hit + .17);
+  assert.equal(s.failures, 1); assert.equal(s.score, 1);
+  s.press(0, 100);
+  assert.equal(s.failures, 5); assert.equal(s.score, 5); assert.equal(s.counts.stray, 0);
+  assert.equal(s.endTime, 4.5 + C.GOOD); assert.equal(s.time, s.endTime);
+});
+
+test('empty input cannot farm survival points or consume a note failure', () => {
+  const s = new C.Session(3, () => {}, { phase: 2 });
+  for (let i = 0; i < 10; i++) { s.press(0, 1); s.release(0); }
+  assert.equal(s.failures, 0); assert.equal(s.score, 0); assert.equal(s.counts.stray, 10);
+});
+
+test('ten minutes of survival generate fresh notes on the beat with bounded memory and no time limit', () => {
+  const s = new C.Session(42, () => {}, { phase: 2 });
+  let count = 0, lastHit = 0;
+  while (lastHit < 600) {
+    const n = s.chart.find(n => !n.resolved);
+    assert.ok(n); assert.ok(n.hit > lastHit); assert.equal(n.hit * 2, Math.round(n.hit * 2));
+    assert.ok(n.lanes.length === 1 || C.PAIRS.some(pair => pair.join() === n.lanes.join()));
+    assert.ok(n.travel <= 1.2); assert.ok(s.chart.length < 24);
+    hit(s, n); lastHit = n.hit; count++;
+  }
+  assert.equal(s.finished, false); assert.equal(s.failures, 0); assert.equal(s.counts.perfect, count);
+  assert.equal(s.score, count * 6 - 5); assert.equal(s.bonusScore, count - 5);
+  assert.equal(s.time, 600); assert.equal(C.speedAt(s.time, 2), 12);
 });

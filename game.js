@@ -10,21 +10,11 @@
   const COLORS = ['#ffdf32', '#21f5f3', '#ff42c8', '#ad79ff'];
   const JUDGE_COLORS = { perfect: '#fff18b', special: '#ff82e7', great: '#6dffff', good: '#c7afff', miss: '#ff739d', stray: '#ff739d' };
   const CODE_TO_LANE = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
-  const POSE_MASK = { 1: 'D', 2: 'F', 4: 'J', 8: 'K', 3: 'DF', 12: 'JK', 5: 'DJ', 10: 'FK' };
+  const POSE_MASK = { 1: 'D', 2: 'F', 4: 'J', 8: 'K', 9: 'DK', 6: 'FJ', 5: 'DJ', 10: 'FK' };
   const INTRO_DURATION = 3.5; // Three one-second Ready pumps, then half a second of Go.
   const HIT_LIGHT_DURATION = .78;
   const NOTE_WIDTH = .116;
-  const POSES = {
-    normal: { file: 'normal.png', unit: 685, x: 1024, feet: 1910 },
-    D: { file: 'Left_leg.png', unit: 438, x: 610, feet: 1124 },
-    F: { file: 'left_arms (1).png', unit: 685, x: 1000, feet: 1870 },
-    J: { file: 'Right_arms.png', unit: 685, x: 1134, feet: 1870 },
-    K: { file: 'Right_leg.png', unit: 685, x: 1040, feet: 1855 },
-    DF: { file: 'left_leg_arms.png', unit: 685, x: 1000, feet: 1870 },
-    JK: { file: 'Right_leg_arms.png', unit: 685, x: 1134, feet: 1870 },
-    DJ: { file: 'mix_right to left.png', unit: 730, x: 838, feet: 1860 },
-    FK: { file: 'mix_left to right.png', unit: 730, x: 901, feet: 1860 }
-  };
+  const POSES = { normal: true, D: true, F: true, J: true, K: true, DK: true, FJ: true, DJ: true, FK: true };
   const textures = {};
   const otterMaterials = {};
   const skeletonTextures = {};
@@ -40,6 +30,7 @@
   let openingPlayPending = false, revealTimer = null, titleLogoLoaded = false;
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
+  let intermissionElapsed = 0, phaseOneScore = 0;
   let best = Math.max(0, Number(storeGet('hwarak-best-v2', '0')) || 0);
   const audio = { ctx: null, gain: null, enabled: storeGet('hwarak-sound', 'true') !== 'false', nextBeat: -7, nodes: new Set() };
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -48,6 +39,10 @@
   const visible = (id, show) => { $(id).hidden = !show; };
   const randomSeed = () => { try { return crypto.getRandomValues(new Uint32Array(1))[0]; } catch { return Date.now() >>> 0; } };
   const currentTime = () => mode === 'playing' && !manual ? baseTime + (performance.now() - anchor) / 1000 : time;
+  const formatTime = (seconds, precise = false) => {
+    const ticks = Math.floor(Math.max(0, seconds) * 10 + 1e-6), whole = Math.floor(ticks / 10);
+    return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}${precise ? '.' + ticks % 10 : ''}`;
+  };
   const target = lane => ({ x: width * (.155 + lane * .23), y: height * .845 });
   const horizon = () => height * (phone ? .425 : .42);
   const noteHorizon = () => height * .59;
@@ -149,9 +144,9 @@
     return { x: width * .5, feet, head, figureHeight: head * 2.7 };
   }
   function sideDancerLayout(t) {
-    if (!session || t < C.PRACTICE || mode === 'loading' || mode === 'waiting') return [];
+    if (!session || (session.phase === 1 && t < C.PRACTICE)) return [];
     const hero = heroLayout(), figureHeight = hero.figureHeight * .79;
-    const opacity = clamp((t - C.PRACTICE) / .7);
+    const opacity = session.phase === 2 ? 1 : clamp((t - C.PRACTICE) / .7);
     return [.235, .765].map((x, index) => ({ x: width * x, feet: height * .615, figureHeight,
       head: figureHeight * 52 / 432, opacity, pose, kind: 'skeleton', color: index ? '#fa68e0' : '#53f4ff' }));
   }
@@ -399,7 +394,7 @@
     }
   }
   function render(now) {
-    const inGame = !!session, t = inGame ? Math.max(0, time) : now;
+    const inGame = !!session, t = inGame ? Math.max(0, time) + intermissionElapsed : now;
     drawBackdrop(t, false);
     if (inGame) { drawSideDancers(t); cachedLayer('lanes', drawLaneLayer); drawCharacter(t); }
     if (inGame) {
@@ -408,7 +403,7 @@
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, width, target(0).y); ctx.clip();
       notes.sort((a, b) => b.hit - a.hit).forEach(note => drawNote(note, time));
       ctx.restore();
-      drawEffects(time);
+      drawEffects(time + intermissionElapsed);
     }
   }
 
@@ -439,7 +434,7 @@
     const end = Math.floor((time + .12) / C.BEAT);
     for (let beat = audio.nextBeat; beat <= end; beat++) {
       const at = beat * C.BEAT;
-      if (at >= time - .015 && at < C.DURATION) {
+      if (at >= time - .015 && (session?.phase === 2 || at < C.DURATION)) {
         const when = audio.ctx.currentTime + Math.max(.003, at - time);
         tone(when, beat % 4 === 0 ? 140 : 100, .075, beat % 4 === 0 ? .7 : .44, true);
       }
@@ -453,8 +448,8 @@
     document.querySelector('.sound-label').textContent = active ? '박자음 ON' : audio.enabled ? '박자음 켜기' : '박자음 OFF';
   }
   function onJudge(event) {
-    const note = event.noteId == null ? null : session?.chart[event.noteId];
-    if (note && time - note.hit > .45) return;
+    const note = event.noteId == null ? null : session?.chart.find(note => note.id === event.noteId);
+    if (note && session.phase === 1 && time - note.hit > .45) return;
     const now = time;
     if (event.judgement !== 'miss' && event.judgement !== 'stray') {
       for (const lane of event.lanes) fx.push(hitLight(lane, now, event.noteId || 0));
@@ -480,6 +475,7 @@
     sources[lane].add(source); pads[lane].dataset.down = 'true'; lastLane = lane;
     if (first) {
       time = currentTime(); session.press(lane, time); updatePose(); updateHUD();
+      if (session.finished) endRound();
       // Replace the accepted note with its light effect in the input event itself.
       render(performance.now() / 1000);
     }
@@ -491,6 +487,7 @@
   }
   function setMode(next) {
     mode = next; stage.dataset.mode = mode;
+    stage.dataset.phase = String(session?.phase || 1);
     visible('opening-screen', mode === 'opening' || mode === 'revealing');
     visible('title-screen', mode === 'title' || mode === 'revealing');
     $('start-button').disabled = !ready || mode !== 'title';
@@ -498,16 +495,20 @@
     const game = !!session;
     for (const id of ['hud', 'round-progress', 'beat-indicator', 'key-pads']) visible(id, game);
     if (mode !== 'playing') { visible('countdown', false); visible('phase-announcement', false); }
+    visible('clear-cue', mode === 'intermission');
+    $('pause-button').disabled = mode !== 'playing' && mode !== 'resuming';
   }
-  function startGame(seed = randomSeed()) {
+  function startGame(seed = randomSeed(), phase = 1) {
     if (!ready || !$('rotate-notice').hidden) return;
     openingVideo.pause(); clearTimeout(revealTimer);
     visible('title-impact', false);
     stopAudio(); clearInputs(); fx = []; feedback = null; phaseAnnounced = false;
+    intermissionElapsed = 0;
+    if (phase === 1) phaseOneScore = 0;
     time = -INTRO_DURATION; baseTime = -INTRO_DURATION; anchor = performance.now(); manual = false; pose = 'normal'; lastHitTime = -99;
-    session = new C.Session(seed, onJudge); audio.nextBeat = -7;
+    session = new C.Session(seed, onJudge, { phase }); audio.nextBeat = -7;
     setMode('playing'); updateHUD();
-    $('game-status').textContent = 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
+    $('game-status').textContent = phase === 2 ? '2페이즈 도전. Special 이상으로 버티세요. 다섯 번째 실수에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
   }
   function syncOpeningPlayback() {
     const allowed = mode === 'opening' && !document.hidden && $('rotate-notice').hidden;
@@ -563,50 +564,79 @@
   function pauseGame(reason = '준비되면 다시 무대로 돌아가요.') {
     if (mode !== 'playing' && mode !== 'resuming') return;
     time = currentTime(); session.advance(time); baseTime = time; clearInputs(); stopAudio();
+    if (session.finished) { endRound(); return; }
     setText('pause-reason', reason); visible('countdown', false); setMode('paused');
   }
   function resumeGame() {
     if (mode !== 'paused' || !$('rotate-notice').hidden) return;
     resumeRemaining = 1.5; setMode('resuming'); initAudio();
   }
+  function endRound() {
+    if (mode !== 'playing' && mode !== 'resuming') return;
+    time = session.endTime; baseTime = time;
+    stopAudio(); clearInputs(); visible('countdown', false);
+    if (session.phase === 1) {
+      phaseOneScore = session.score; intermissionElapsed = 0; setMode('intermission');
+      $('game-status').textContent = '1페이즈 완료. 5초 뒤 점수와 도전하기 버튼이 나타납니다.';
+    } else finishGame();
+    updateHUD();
+  }
   function finishGame() {
     stopAudio(); clearInputs(); visible('countdown', false); setMode('result');
+    const survival = session.phase === 2;
     const accuracy = session.accuracy, grade = accuracy >= 95 ? 'S' : accuracy >= 85 ? 'A' : accuracy >= 70 ? 'B' : 'C';
-    const newBest = session.score > best;
+    const newBest = !survival && session.score > best;
     if (newBest) { best = session.score; storeSet('hwarak-best-v2', best); }
-    setText('result-title', newBest ? '나의 최고 무대!' : accuracy >= 85 ? '오늘 무대, 찢었다!' : '첫 박자부터 피날레까지!');
+    setText('result-title', survival ? '여기까지, 멋진 도전!' : '1페이즈 클리어!');
+    setText('result-eyebrow', survival ? 'SURVIVAL RESULT' : 'READY FOR THE NEXT STAGE?');
+    setText('result-score-label', survival ? '2페이즈 점수' : '1페이즈 점수');
+    visible('result-grade', !survival); visible('survival-result', survival);
+    setText('result-survival-time', formatTime(session.endTime || 0, true));
+    setText('challenge-button', survival ? '도전 다시하기' : '도전하기');
+    setText('challenge-rules', survival ? `5 / 5 실수 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '2.0배속 출발 · 1분마다 +1.0배속 · Special 미만 누적 5회면 탈락');
+    visible('combined-result', survival);
+    setText('combined-result', `1페이즈 ${phaseOneScore.toLocaleString('ko-KR')}점 · 합산 ${(phaseOneScore + session.score).toLocaleString('ko-KR')}점`);
     setText('result-grade', grade); setText('result-score', session.score.toLocaleString('ko-KR'));
     setText('result-combo', String(session.maxCombo)); setText('result-accuracy', accuracy.toFixed(1) + '%');
     setText('result-breakdown', `기본 ${session.baseScore} + Perfect 보너스 ${session.bonusScore}`);
     setText('result-counts', `PERFECT ${session.counts.perfect} · SPECIAL ${session.counts.special} · GREAT ${session.counts.great} · GOOD ${session.counts.good} · MISS ${session.counts.miss} · 엇박자 ${session.counts.stray}`);
-    $('game-status').textContent = `공연 완료. 점수 ${session.score}, 최대 콤보 ${session.maxCombo}, 정확도 ${accuracy.toFixed(1)}퍼센트.`;
+    $('game-status').textContent = survival ? `도전 종료. 버틴 시간 ${formatTime(time, true)}, 2페이즈 점수 ${session.score}.` : `1페이즈 완료. 점수 ${session.score}. 도전하기 또는 처음부터 다시를 선택하세요.`;
   }
   function updateHUD() {
     if (!session) return;
-    const elapsed = Math.max(0, time), left = Math.max(0, Math.ceil(C.DURATION - elapsed)), practice = elapsed < C.PRACTICE;
-    setText('timer', `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`);
+    const elapsed = Math.max(0, time), left = Math.max(0, Math.ceil(C.DURATION - elapsed)), survival = session.phase === 2, practice = !survival && elapsed < C.PRACTICE;
+    setText('timer', formatTime(survival ? elapsed : left, survival));
+    setText('timer-label', survival ? '버틴 시간' : '남은 시간');
+    setText('score-label', survival ? 'PHASE 2 SCORE' : 'TOTAL SCORE');
     setText('score', String(session.score).padStart(4, '0'));
     setText('bonus-score', `+${session.bonusScore}`);
     setText('perfect-streak', session.perfectStreak >= C.BONUS_CHARGE ? `${session.perfectStreak}연속 · 다음 PERFECT +1` : `연속 ${session.perfectStreak} / ${C.BONUS_CHARGE}`);
     $('bonus-panel').classList.toggle('charged', session.perfectStreak >= C.BONUS_CHARGE);
     [...$('streak-dots').children].forEach((dot, index) => dot.classList.toggle('filled', index < session.perfectStreak));
     setText('combo', session.combo ? `${session.combo} COMBO!` : elapsed < 2.5 ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
-    setText('phase-label', practice ? 'WARM UP' : 'MAIN STAGE'); setText('phase-title', practice ? '연습 무대' : '본무대');
-    setText('phase-detail', practice ? `단일 노트 · ${Math.max(0, Math.ceil(30 - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
-    setText('speed', `SPEED ×${(2.4 / C.travelAt(elapsed)).toFixed(2)}`);
-    $('round-progress-fill').style.width = `${clamp(elapsed / C.DURATION) * 100}%`;
+    setText('phase-label', survival ? 'SURVIVAL' : practice ? 'WARM UP' : 'PHASE 1'); setText('phase-title', survival ? '2페이즈 도전' : practice ? '연습 무대' : '본무대');
+    setText('phase-detail', survival ? `실수 ${session.failures} / 5 · Special 이상!` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(30 - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
+    visible('survival-lives', survival);
+    [...$('survival-lives').children].forEach((life, i) => life.classList.toggle('lost', i < session.failures));
+    $('survival-lives').setAttribute('aria-label', `실수 ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
+    setText('speed', `SPEED ×${C.speedAt(elapsed, session.phase).toFixed(2)}`);
+    $('round-progress-fill').style.width = `${survival ? (1 - session.failures / C.FAILURE_LIMIT) * 100 : clamp(elapsed / C.DURATION) * 100}%`;
     const beat = Math.floor(elapsed / C.BEAT) % 4;
     [...$('beat-indicator').querySelectorAll('i')].forEach((dot, i) => dot.classList.toggle('active', i === beat));
     drawCountdown();
-    visible('phase-announcement', mode === 'playing' && elapsed >= 30 && elapsed < 31.6);
-    if (!phaseAnnounced && elapsed >= 30) { phaseAnnounced = true; $('game-status').textContent = '본무대 시작. 이제 두 개의 노트가 함께 나오고 속도가 점점 빨라집니다.'; }
+    visible('phase-announcement', !survival && mode === 'playing' && elapsed >= 30 && elapsed < 31.6);
+    if (!survival && !phaseAnnounced && elapsed >= 30) { phaseAnnounced = true; $('game-status').textContent = '본무대 시작. DK, FJ, DJ, FK 동시 노트가 함께 나오고 속도가 점점 빨라집니다.'; }
   }
   function update(now, delta) {
+    if (mode === 'intermission' && !manual) {
+      intermissionElapsed = Math.min(C.INTERMISSION, intermissionElapsed + delta);
+      if (intermissionElapsed >= C.INTERMISSION) finishGame();
+    }
     if (mode === 'resuming') {
       resumeRemaining -= delta;
       if (resumeRemaining <= 0) { baseTime = time; anchor = now; audio.nextBeat = Math.ceil(time / C.BEAT); setMode('playing'); }
     }
-    if (mode === 'playing') { time = currentTime(); session.advance(time); scheduleBeat(); if (session.finished) finishGame(); }
+    if (mode === 'playing') { time = currentTime(); session.advance(time); if (session.finished) endRound(); else scheduleBeat(); }
     updateHUD();
   }
   function frame(now) {
@@ -685,6 +715,7 @@
     syncOpeningPlayback();
   });
   $('retry-button').addEventListener('click', () => startGame());
+  $('challenge-button').addEventListener('click', () => { if (mode === 'result') { initAudio(); startGame(randomSeed(), 2); } });
   $('restart-pause').addEventListener('click', () => startGame());
   $('pause-button').addEventListener('click', () => pauseGame()); $('resume-button').addEventListener('click', resumeGame);
   $('sound-toggle').addEventListener('click', () => {
@@ -703,7 +734,10 @@
 
   // Readable state and deterministic time stepping for repeatable gameplay verification.
   window.render_game_to_text = () => JSON.stringify({
-    mode, ready, time: +time.toFixed(3), phase: time < 30 ? 'practice' : 'challenge', phone, rotateRequired: !$('rotate-notice').hidden,
+    mode, ready, time: +time.toFixed(3), roundPhase: session?.phase || 1, phase: session?.phase === 2 ? 'survival' : time < 30 ? 'practice' : 'challenge', phone, rotateRequired: !$('rotate-notice').hidden,
+    failures: session?.failures || 0, failureLimit: C.FAILURE_LIMIT, survivalTime: session?.phase === 2 ? +Math.max(0, time).toFixed(3) : null,
+    phaseOneScore, combinedScore: session?.phase === 2 ? phaseOneScore + session.score : session?.score || 0,
+    intermissionRemaining: mode === 'intermission' ? +(C.INTERMISSION - intermissionElapsed).toFixed(3) : 0,
     rendering: { quality: quality.profile.name, ratio: +renderRatio.toFixed(2), motesPerHit: quality.profile.motes, automaticChanges: quality.changes, cachedLayers: staticLayers.size },
     score: session?.score || 0, combo: session?.combo || 0, maxCombo: session?.maxCombo || 0, accuracy: +(session?.accuracy ?? 100).toFixed(2),
     baseScore: session?.baseScore || 0, bonusScore: session?.bonusScore || 0, perfectStreak: session?.perfectStreak || 0,
@@ -715,7 +749,7 @@
     hero: heroLayout(), skeletonsLoaded: Object.keys(skeletonTextures).length,
     sideDancers: sideDancerLayout(Math.max(0, time)).map(d => ({ kind: d.kind, x: +d.x.toFixed(1), feet: +d.feet.toFixed(1), figureHeight: +d.figureHeight.toFixed(1), opacity: +d.opacity.toFixed(2), pose: d.pose })),
     counts: session?.counts || {}, pose, held: session ? [...session.held].map(l => C.KEYS[l]) : [], seed: session?.seed,
-    speed: +(2.4 / C.travelAt(Math.max(0, time))).toFixed(3),
+    speed: +C.speedAt(Math.max(0, time), session?.phase || 1).toFixed(3),
     notes: session?.visible(time).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit, spawn: +n.spawn.toFixed(3), travel: +n.travel.toFixed(3), partial: Object.keys(n.inputs).map(l => C.KEYS[l]) })) || [],
     next: session?.chart.filter(n => !n.resolved && n.hit > time).slice(0, 4).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit })) || [],
     coordinates: 'Canvas origin top-left. Notes emerge at center x, 59% height near the front-stage otter; targets at 84.5% height.'
@@ -729,12 +763,25 @@
       const step = Math.min(resumeRemaining, seconds); resumeRemaining -= step; seconds -= step;
       if (resumeRemaining <= 0) setMode('playing');
     }
-    if (mode === 'playing') { time += seconds; session.advance(time); if (session.finished) finishGame(); }
+    if (mode === 'intermission') {
+      intermissionElapsed = Math.min(C.INTERMISSION, intermissionElapsed + seconds);
+      if (intermissionElapsed >= C.INTERMISSION) finishGame();
+    } else if (mode === 'playing') {
+      time += seconds; session.advance(time);
+      if (session.finished) {
+        const leftover = Math.max(0, time - session.endTime); endRound();
+        if (mode === 'intermission') {
+          intermissionElapsed = Math.min(C.INTERMISSION, leftover);
+          if (intermissionElapsed >= C.INTERMISSION) finishGame();
+        }
+      }
+    }
     updateHUD(); render(performance.now() / 1000);
   };
   // A seeded start is exposed only for local/browser test runs; ordinary starts use a fresh random seed.
   window.HwarakTest = {
-    start: seed => startGame(seed),
+    start: (seed, phase = 1) => startGame(seed, phase),
+    time: () => time,
     chart: () => session?.chart.map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit, spawn: n.spawn, travel: n.travel })) || [],
     renderQuality: name => {
       const level = window.HwarakQuality.profiles.findIndex(profile => profile.name === name);
