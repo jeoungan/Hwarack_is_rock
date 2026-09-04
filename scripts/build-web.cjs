@@ -31,6 +31,7 @@ for (const source of ['style.css', 'rhythm-core.js', 'asset-map.js', 'render-qua
   write(output, data); html = html.replace(`"${source}"`, `"${output}"`);
 }
 for (const asset of Object.values(context.window.HwarakAssets)) write(asset, fs.readFileSync(path.join(root, asset)));
+write('assets/kakao-share-20260904.jpg', fs.readFileSync(path.join(root, 'assets/kakao-share-20260904.jpg')));
 write('index.html', html);
 // Cloudflare Pages-compatible headers; other hosts can apply the same policy.
 write('_headers', '/\n  Cache-Control: no-cache\n/index.html\n  Cache-Control: no-cache\n/assets/optimized/*\n  Cache-Control: public, max-age=31536000, immutable\n/static/*\n  Cache-Control: public, max-age=31536000, immutable\n');

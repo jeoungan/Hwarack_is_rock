@@ -4,8 +4,8 @@ const path = require('node:path');
 const os = require('node:os');
 const ROOT = process.argv.includes('--dist') ? path.join(__dirname, 'dist') : __dirname;
 const PORT = Number(process.env.PORT) || 4173;
-const files = new Set(['index.html', 'style.css', 'game.js', 'rhythm-core.js', 'asset-map.js', 'render-quality.js', 'assets/neon-festival.png', 'assets/opening.mp4', 'assets/title-logo.png']);
-const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.webp': 'image/webp', '.mp4': 'video/mp4' };
+const files = new Set(['index.html', 'style.css', 'game.js', 'rhythm-core.js', 'asset-map.js', 'render-quality.js', 'assets/neon-festival.png', 'assets/opening.mp4', 'assets/title-logo.png', 'assets/kakao-share-20260904.jpg']);
+const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4' };
 const server = http.createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   let relative;
