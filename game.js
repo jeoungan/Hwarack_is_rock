@@ -16,7 +16,6 @@
   const INTRO_DURATION = 3.5; // Three one-second Ready pumps, then half a second of Go.
   const HIT_LIGHT_DURATION = .78;
   const NOTE_WIDTH = .116;
-  const NOTE_DEPTH = .28;
   const POSES = { normal: true, D: true, F: true, J: true, K: true, DK: true, FJ: true, DJ: true, FK: true, DF: true, JK: true };
   const ENCORE_POSES = ['DF', 'JK', 'DF', 'JK', 'FJ'];
   const textures = {};
@@ -72,8 +71,7 @@
     // The leading edge reaches the line at the hit time. Late-input grace never
     // carries the solid note below the line.
     const p = projection(lane, Math.min(1, u));
-    return { ...p, w: width * NOTE_WIDTH * p.scale,
-      h: Math.max(.7, Math.max(7, Math.min(18, height * .022, width * .036)) * p.scale) };
+    return { ...p, w: width * NOTE_WIDTH * p.scale, h: Math.max(2.3, Math.min(height * .009, width * .012) * p.scale) };
   }
 
 
@@ -339,41 +337,16 @@
     for (const lane of pending) {
       const p = noteShape(lane, u), { w, h } = p;
       const cy = p.y - h / 2;
-      bloom(p.x, cy, w * .7, COLORS[lane], .72, Math.max(.16, h / w));
-      // A long solid top recedes along this lane toward the vanishing point.
-      // It is still one tap: the entire body is consumed at the front edge.
-      // Keep a visible gap before the next note on this lane at the denser tempo.
-      const depth = Math.min(NOTE_DEPTH, .40 / note.travel);
-      const back = noteShape(lane, Math.max(0, Math.min(1, u) - depth));
-      const left = [p.x - w / 2, p.y - h], right = [p.x + w / 2, p.y - h];
-      const backLeft = [back.x - back.w / 2, back.y - back.h];
-      const backRight = [back.x + back.w / 2, back.y - back.h];
-      ctx.save(); ctx.shadowColor = COLORS[lane]; ctx.shadowBlur = Math.max(3, 7 * p.scale);
-      poly([backLeft, left, [left[0], p.y], [backLeft[0], back.y]], COLORS[lane] + 'b0');
-      poly([backRight, right, [right[0], p.y], [backRight[0], back.y]], COLORS[lane] + 'd0');
-      const top = ctx.createLinearGradient(back.x, backLeft[1], p.x, left[1]);
-      top.addColorStop(0, COLORS[lane] + 'd9'); top.addColorStop(.6, COLORS[lane]); top.addColorStop(1, '#eaffff');
-      poly([backLeft, backRight, right, left], top, COLORS[lane], Math.max(.7, p.scale * 1.2));
-      ctx.shadowBlur = 0;
-      // Wide reflected faces follow the top surface instead of a trailing glow.
-      const surface = (across, depth) => [lerp(lerp(backLeft[0], backRight[0], across), lerp(left[0], right[0], across), depth),
-        lerp(backLeft[1], left[1], depth)];
-      poly([surface(0, 0), surface(.38, 0), surface(.73, .62), surface(.21, .83), surface(0, .54)], '#ffffff45');
-      poly([surface(1, .38), surface(1, .75), surface(.52, 1), surface(.13, 1)], '#ffffff70');
-      ctx.restore();
+      bloom(p.x, cy, w * .66, COLORS[lane], .8, .13);
+      const tail = noteShape(lane, Math.max(0, Math.min(1, u) - .03));
+      const trail = ctx.createLinearGradient(tail.x, tail.y, p.x, cy);
+      trail.addColorStop(0, COLORS[lane] + '00'); trail.addColorStop(1, COLORS[lane] + '50');
+      poly([[tail.x - tail.w * .35, tail.y - h], [tail.x + tail.w * .35, tail.y - h], [p.x + w * .4, cy], [p.x - w * .4, cy]], trail);
       const fill = ctx.createLinearGradient(0, p.y - h, 0, p.y);
-      fill.addColorStop(0, '#efffff'); fill.addColorStop(.18, COLORS[lane]);
-      fill.addColorStop(.75, COLORS[lane]); fill.addColorStop(1, '#ffffff');
+      fill.addColorStop(0, COLORS[lane]); fill.addColorStop(.5, '#f9ffff'); fill.addColorStop(1, COLORS[lane]);
       ctx.save(); ctx.shadowColor = COLORS[lane]; ctx.shadowBlur = Math.max(5, 11 * p.scale);
       ctx.fillStyle = fill; ctx.beginPath();
-      ctx.roundRect(p.x - w / 2, p.y - h, w, h, Math.min(w * .12, h * .25)); ctx.fill();
-      // Broad glossy faces give the note a solid body; the leading edge stays at p.y.
-      ctx.shadowBlur = 0; ctx.clip();
-      poly([[p.x - w / 2, p.y - h], [p.x + w * .13, p.y - h],
-        [p.x - w * .04, p.y - h * .34], [p.x - w / 2, p.y - h * .58]], '#ffffff65');
-      poly([[p.x + w * .1, p.y - h * .08], [p.x + w / 2, p.y - h * .76],
-        [p.x + w / 2, p.y], [p.x - w * .13, p.y]], '#ffffff80');
-      rect(p.x - w / 2, p.y - h * .25, w, h * .13, '#080a3020');
+      ctx.roundRect(p.x - w / 2, p.y - h, w, h, Math.min(3, h / 2)); ctx.fill();
       ctx.restore();
     }
     ctx.restore();
