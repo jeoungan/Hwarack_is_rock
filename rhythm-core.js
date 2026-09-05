@@ -10,14 +10,14 @@
   const BEAT = 60 / track.bpm;
   const BEAT_OFFSET = track.beatOffset;
   const FIRST_HIT = BEAT_OFFSET + track.firstBeat * BEAT;
-  const PERFECT = 0.045;
-  const SPECIAL = 0.080;
-  const GREAT = 0.120;
-  const GOOD = 0.16;
+  const PERFECT = 0.080;
+  const SPECIAL = 0.130;
+  const GREAT = 0.180;
+  const GOOD = 0.240;
   const POINTS = Object.freeze({ perfect: 5, special: 4, great: 3, good: 2, miss: 1 });
   const WINDOWS = [['perfect', PERFECT], ['special', SPECIAL], ['great', GREAT], ['good', GOOD]];
   const BONUS_CHARGE = 5;
-  const CHORD_GAP = 0.10;
+  const CHORD_GAP = 0.18;
   const FAILURE_LIMIT = 5;
   const INTERMISSION = 5;
   const PAIRS = [[0, 3], [1, 2], [0, 2], [1, 3]];
@@ -43,12 +43,12 @@
     return result;
   }
   function speedAt(time, phase = 1) {
-    return phase === 2 ? 2 + Math.max(0, time) / 60 : 1 + clamp((time - PRACTICE) / (DURATION - PRACTICE));
+    return phase === 2 ? 1.6 + Math.max(0, time) / 90 : 1 + .6 * clamp((time - PRACTICE) / (DURATION - PRACTICE));
   }
   function travelAt(time, phase = 1) { return 2.4 / speedAt(time, phase); }
   function noteGenerator(seed, phase) {
     const rng = random(seed);
-    let singles = [], pairs = [], id = 0, challengeCount = 0, beatIndex = track.firstBeat, previous = null;
+    let singles = [], pairs = [], id = 0, challengeCount = 0, denseIndex = 0, beatIndex = track.firstBeat, previous = null;
     const nextSingle = excluded => {
       if (!singles.some(lane => !excluded.includes(lane))) singles = shuffle([0, 1, 2, 3], rng);
       const index = singles.findLastIndex(lane => !excluded.includes(lane));
@@ -58,12 +58,12 @@
       const hit = +(BEAT_OFFSET + beatIndex * BEAT).toFixed(6);
       const travel = travelAt(hit, phase);
       const spawn = hit - travel;
-      // Half-beat windows overlap by 20ms. Alternate hands/lanes so a late
+      // Half-beat windows overlap. Alternate hands/lanes so a late
       // input for one note can never be assigned to its early neighbour.
       const excluded = previous && hit - previous.hit < BEAT - 1e-6 ? previous.lanes : [];
       let lanes = nextSingle(excluded);
       if (phase === 2 || spawn >= PRACTICE) {
-        const chance = phase === 2 ? .54 : 0.24 + 0.30 * clamp((hit - PRACTICE) / (DURATION - PRACTICE));
+        const chance = phase === 2 ? .42 : .22 + .20 * clamp((hit - PRACTICE) / (DURATION - PRACTICE));
         if (challengeCount++ === 0 || rng() < chance) {
           const compatible = pair => pair.every(lane => !excluded.includes(lane));
           if (!pairs.some(compatible)) pairs = shuffle(PAIRS.filter(compatible), rng);
@@ -71,8 +71,9 @@
         }
       }
       const note = { id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {} };
-      // The track has strong attacks on both the beat and the eighth-note offbeat.
-      beatIndex += phase === 2 || spawn >= PRACTICE ? .5 : 1;
+      // One full beat, then two half beats: three notes every two beats.
+      // This keeps musical accents and a breathing gap instead of constant eighths.
+      beatIndex += phase === 2 || spawn >= PRACTICE ? [1, .5, .5][denseIndex++ % 3] : 1;
       previous = note;
       return note;
     };
@@ -111,6 +112,11 @@
     }
     advance(time) {
       if (this.finished) return;
+      for (const note of this.chart) if (!note.resolved) {
+        for (const lane of Object.keys(note.inputs)) {
+          if (time - note.inputs[lane].time > CHORD_GAP + 1e-9) delete note.inputs[lane];
+        }
+      }
       if (this.phase === 2) {
         // Resolve overdue notes in chronological order. A long frame or test jump
         // ends exactly at the fifth failure, never at the later polling time.
@@ -176,15 +182,16 @@
         return;
       }
       note.inputs[lane] = { time, delta: time - note.hit };
-      if (!note.lanes.every(key => note.inputs[key] && this.held.has(key))) return;
+      // A quick tap remains valid after release so a natural two-finger roll
+      // is accepted; holding a key still cannot hit any later note.
+      if (!note.lanes.every(key => note.inputs[key])) return;
       const inputs = note.lanes.map(key => note.inputs[key]);
-      if (Math.max(...inputs.map(x => x.time)) - Math.min(...inputs.map(x => x.time)) > CHORD_GAP) return;
+      if (Math.max(...inputs.map(x => x.time)) - Math.min(...inputs.map(x => x.time)) > CHORD_GAP + 1e-9) return;
       const worst = inputs.reduce((a, b) => Math.abs(a.delta) > Math.abs(b.delta) ? a : b);
       this.resolve(note, WINDOWS.find(([, limit]) => Math.abs(worst.delta) <= limit + 1e-9)[0], worst.delta);
     }
     release(lane) {
       this.held.delete(lane);
-      for (const note of this.chart) if (!note.resolved) delete note.inputs[lane];
     }
     clearHeld() {
       this.held.clear();

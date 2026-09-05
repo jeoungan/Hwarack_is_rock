@@ -15,7 +15,7 @@ test('100 random charts preserve the practice boundary, beat grid, supported cho
       assert.ok(chart[i].hit > chart[i - 1].hit);
       assert.ok(chart[i].travel <= chart[i - 1].travel);
     }
-    assert.ok(chart.at(-1).travel >= 1.2 && chart.at(-1).travel < 1.21);
+    assert.ok(chart.at(-1).travel >= 1.5 && chart.at(-1).travel < 1.51);
   }
 });
 test('same seed reproduces a chart; a new seed changes it', () => {
@@ -23,17 +23,17 @@ test('same seed reproduces a chart; a new seed changes it', () => {
   assert.notDeepEqual(C.createChart(7).map(n => n.lanes), C.createChart(8).map(n => n.lanes));
 });
 test('five timing grades have inclusive boundaries, symmetric early/late windows and 5/4/3/2/1 points', () => {
-  for (const sign of [-1, 1]) for (const [delta, grade] of [[0, 'perfect'], [.045, 'perfect'], [.0451, 'special'], [.08, 'special'], [.0801, 'great'], [.12, 'great'], [.1201, 'good'], [.16, 'good']]) {
+  for (const sign of [-1, 1]) for (const [delta, grade] of [[0, 'perfect'], [.08, 'perfect'], [.0801, 'special'], [.13, 'special'], [.1301, 'great'], [.18, 'great'], [.1801, 'good'], [.24, 'good']]) {
     const s = new C.Session(5), n = s.chart[0];
     s.press(n.lanes[0], n.hit + sign * delta);
     assert.equal(n.judgement, grade, `${sign * delta}s`);
     assert.equal(s.score, C.POINTS[grade]);
   }
-  const s = new C.Session(5); s.advance(s.chart[0].hit + .1601);
+  const s = new C.Session(5); s.advance(s.chart[0].hit + .2401);
   assert.equal(s.chart[0].judgement, 'miss'); assert.equal(s.score, 1);
   s.advance(s.chart[0].hit + .3); assert.equal(s.score, 1, 'a miss is scored once');
 });
-test('a chord needs overlapping presses and counts as one displayed judgement and streak event', () => {
+test('a chord accepts two timely presses and counts as one displayed judgement and streak event', () => {
   const s = new C.Session(9), chord = s.chart.find(n => n.lanes.length === 2);
   s.advance(chord.hit - .05);
   const before = s.score;
@@ -43,13 +43,13 @@ test('a chord needs overlapping presses and counts as one displayed judgement an
   assert.equal(chord.judgement, 'perfect'); assert.equal(s.score, before + 5); assert.equal(s.combo, 1);
   assert.equal(s.counts.perfect, 1); assert.equal(s.perfectStreak, 1);
 });
-test('separate taps and widely separated chord presses do not count as simultaneous', () => {
+test('chord taps more than 180ms apart expire, whether held or released', () => {
   for (const separated of [true, false]) {
     const s = new C.Session(9), chord = s.chart.find(n => n.lanes.length === 2);
-    s.press(chord.lanes[0], chord.hit - .08);
+    s.press(chord.lanes[0], chord.hit - .12);
     if (separated) s.release(chord.lanes[0]);
-    s.press(chord.lanes[1], chord.hit + .05);
-    s.advance(chord.hit + .17);
+    s.press(chord.lanes[1], chord.hit + .10);
+    s.advance(chord.hit + .25);
     assert.equal(chord.judgement, 'miss'); assert.equal(s.score, s.counts.miss);
   }
 });
@@ -57,7 +57,7 @@ test('held/repeated input cannot clear later notes; only missed notes break a co
   const s = new C.Session(15), first = s.chart[0];
   s.press(first.lanes[0], first.hit);
   const later = s.chart.find(n => n.id > first.id && n.lanes.includes(first.lanes[0]));
-  s.press(first.lanes[0], later.hit); s.advance(later.hit + .17);
+  s.press(first.lanes[0], later.hit); s.advance(later.hit + .25);
   assert.equal(later.judgement, 'miss');
   s.clearHeld(); s.press(0, 119.99);
   assert.equal(s.combo, 0); assert.equal(s.counts.stray, 0);
@@ -89,8 +89,8 @@ test('every non-Perfect resets charge but preserves earned bonus; five new Perfe
     for (const n of s.chart.slice(0, 6)) hit(s, n);
     assert.equal(s.bonusScore, 1);
     const breaker = s.chart[6];
-    if (grade === 'miss') s.advance(breaker.hit + .17);
-    else hit(s, breaker, { special: .06, great: .10, good: .14 }[grade]);
+    if (grade === 'miss') s.advance(breaker.hit + .25);
+    else hit(s, breaker, { special: .10, great: .16, good: .22 }[grade]);
     assert.equal(s.perfectStreak, 0, grade);
     assert.equal(s.bonusScore, 1, grade);
     const restart = 7;
@@ -111,15 +111,15 @@ test('a fully Perfect round has exactly chart.length - 5 bonus points including 
   assert.equal(s.score, s.chart.length * 6 - 5); assert.equal(s.accuracy, 100);
 });
 
-test('all chords cross the two hands and phase-one speed reaches exactly 2x at 120 seconds', () => {
+test('all chords cross the two hands and phase-one speed reaches exactly 1.6x at 120 seconds', () => {
   assert.deepEqual(C.PAIRS, [[0, 3], [1, 2], [0, 2], [1, 3]]);
-  for (const [time, speed] of [[0, 1], [15, 1], [67.5, 1.5], [120, 2], [200, 2]]) assert.equal(C.speedAt(time), speed);
-  for (const [time, speed] of [[0, 2], [30, 2.5], [60, 3], [120, 4], [600, 12]]) assert.equal(C.speedAt(time, 2), speed);
+  for (const [time, speed] of [[0, 1], [15, 1], [67.5, 1.3], [120, 1.6], [200, 1.6]]) assert.equal(C.speedAt(time), speed);
+  for (const [time, speed] of [[0, 1.6], [45, 2.1], [90, 2.6], [180, 3.6]]) assert.equal(C.speedAt(time, 2), speed);
 });
 
 test('survival ends at exactly five Misses; every successful grade preserves remaining lives', () => {
   const s = new C.Session(42, () => {}, { phase: 2 });
-  const offsets = [.10, .06, .14, 0, .17, .08, .10, .14, .17, .10, .17, .14, .17, 0, .17];
+  const offsets = [.16, .10, .22, 0, .25, .08, .16, .22, .25, .16, .25, .22, .25, 0, .25];
   let failures = 0;
   for (const offset of offsets) {
     const n = s.chart.find(n => !n.resolved);
@@ -139,11 +139,11 @@ test('survival ends at exactly five Misses; every successful grade preserves rem
 test('a failed two-key chord consumes one life; late input cannot score after the fifth missed note', () => {
   const s = new C.Session(3, () => {}, { phase: 2 });
   const chord = s.chart[0]; assert.equal(chord.lanes.length, 2);
-  s.press(chord.lanes[0], chord.hit); s.release(chord.lanes[0]); s.advance(chord.hit + .17);
+  s.press(chord.lanes[0], chord.hit); s.release(chord.lanes[0]); s.advance(chord.hit + .25);
   assert.equal(s.failures, 1); assert.equal(s.score, 1);
   s.press(0, 100);
   assert.equal(s.failures, 5); assert.equal(s.score, 5); assert.equal(s.counts.stray, 0);
-  assert.ok(Math.abs(s.endTime - (C.FIRST_HIT + 4 * C.BEAT / 2 + C.GOOD)) < 1e-8); assert.equal(s.time, s.endTime);
+  assert.ok(Math.abs(s.endTime - (C.FIRST_HIT + 1.8 + C.GOOD)) < 1e-8); assert.equal(s.time, s.endTime);
 });
 
 test('empty input cannot farm survival points or consume a note failure', () => {
@@ -159,17 +159,17 @@ test('ten minutes of survival generate fresh notes on the beat with bounded memo
     const n = s.chart.find(n => !n.resolved);
     assert.ok(n); assert.ok(n.hit > lastHit); assert.ok(Math.abs((n.hit - C.BEAT_OFFSET) / (C.BEAT / 2) - Math.round((n.hit - C.BEAT_OFFSET) / (C.BEAT / 2))) < 1e-8);
     assert.ok(n.lanes.length === 1 || C.PAIRS.some(pair => pair.join() === n.lanes.join()));
-    assert.ok(n.travel <= 1.2); assert.ok(s.chart.length < 24);
+    assert.ok(n.travel <= 1.5); assert.ok(s.chart.length < 24);
     hit(s, n); lastHit = n.hit; count++;
   }
   assert.equal(s.finished, false); assert.equal(s.failures, 0); assert.equal(s.counts.perfect, count);
   assert.equal(s.score, count * 6 - 5); assert.equal(s.bonusScore, count - 5);
-  assert.ok(s.time >= 600 && s.time < 600 + C.BEAT); assert.ok(C.speedAt(s.time, 2) >= 12);
+  assert.ok(s.time >= 600 && s.time < 600 + C.BEAT); assert.ok(C.speedAt(s.time, 2) >= 8);
 });
 
 test('before the first note and between notes, empty taps never emit a judgement or damage a charged streak', () => {
   const events = [], s = new C.Session(42, e => events.push(e));
-  for (const at of [-3, 0, .5, 1.5, C.FIRST_HIT - .17]) for (let lane = 0; lane < 4; lane++) {
+  for (const at of [-3, 0, .5, 1.5, C.FIRST_HIT - .25]) for (let lane = 0; lane < 4; lane++) {
     s.press(lane, at); s.release(lane);
   }
   assert.equal(events.length, 0); assert.equal(s.score, 0); assert.equal(s.counts.miss, 0);
@@ -179,11 +179,11 @@ test('before the first note and between notes, empty taps never emit a judgement
   assert.deepEqual({ score: s.score, combo: s.combo, bonus: s.bonusScore, accuracy: s.accuracy }, before);
   hit(s, s.chart[6]); assert.equal(s.bonusScore, 2); assert.equal(s.counts.stray, 0);
 });
-test('music chart v3 doubles density and leaves enough time for the final late window', () => {
-  assert.equal(C.PRACTICE, 15); assert.equal(C.CHART_VERSION, 3); assert.equal(C.BEAT, .6);
+test('music chart v4 moderates density and leaves enough time for the final late window', () => {
+  assert.equal(C.PRACTICE, 15); assert.equal(C.CHART_VERSION, 4); assert.equal(C.BEAT, .6);
   for (const seed of [1, 42, 999]) {
     const chart = C.createChart(seed);
-    assert.equal(chart.length, 365); assert.equal(chart[0].hit, 2.865);
+    assert.equal(chart.length, 280); assert.equal(chart[0].hit, 2.865);
     assert.ok(chart.at(-1).hit + C.GOOD < C.DURATION);
     assert.ok(chart.some(n => n.spawn >= 15 && n.spawn < 18 && n.lanes.length === 2));
   }
@@ -195,8 +195,22 @@ test('dense notes alternate lanes, including every chord, across 100 seeds and b
     if (phase === 2) s.fillAhead(120);
     for (let i = 1; i < s.chart.length; i++) {
       const a = s.chart[i - 1], b = s.chart[i], gap = b.hit - a.hit;
-      assert.ok(Math.abs(gap - (phase === 1 && a.spawn < 15 ? .6 : .3)) < 1e-8);
+      assert.ok(Math.abs(gap - .6) < 1e-8 || Math.abs(gap - .3) < 1e-8);
       if (gap < .31) assert.ok(b.lanes.every(lane => !a.lanes.includes(lane)));
     }
   }
+});
+
+test('rolled chord taps stay valid after the first finger is lifted, including the 180ms boundary', () => {
+  for (const [early, late, grade] of [[-.08, .08, 'perfect'], [-.12, .06, 'special']]) {
+    const s = new C.Session(9), n = s.chart.find(n => n.lanes.length === 2);
+    s.press(n.lanes[0], n.hit + early); s.release(n.lanes[0]);
+    s.press(n.lanes[1], n.hit + late); s.release(n.lanes[1]);
+    assert.equal(n.judgement, grade); assert.equal(s.counts[grade], 1);
+    s.advance(n.hit + .25); assert.equal(n.judgement, grade);
+  }
+});
+test('survival alternates breathing beats and half-beat accents', () => {
+  const s = new C.Session(42, () => {}, { phase: 2 }); s.fillAhead(7);
+  assert.deepEqual(s.chart.slice(0, 7).map(n => n.hit), [2.865, 3.465, 3.765, 4.065, 4.665, 4.965, 5.265]);
 });

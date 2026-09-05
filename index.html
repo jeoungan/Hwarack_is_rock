@@ -40,7 +40,7 @@
     <header class="topbar">
       <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><strong>HWARAK<span>LIVE</span></strong><span class="brand-caption">오늘 무대의 주인공, 너.</span></div>
       <div class="tools">
-        <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="음악 켜짐, 누르면 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">음악 ON</span></button>
+        <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="영상과 음악 소리 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">소리 끄기</span></button>
         <button id="fullscreen" class="tool" aria-label="전체 화면">⛶ <span>전체 화면</span></button>
       </div>
     </header>
@@ -49,7 +49,7 @@
       <canvas id="game-canvas" aria-label="캐릭터가 춤추는 축제 무대와 D F J K 네 개의 원근형 노트 경로"></canvas>
       <section id="title-screen" class="title-screen overlay" aria-label="화락제도 락이다 시작 화면" hidden>
         <h1 class="title-art"><img id="title-logo" src="assets/optimized/title-logo.49fa4a7f70eb.webp" alt="화락제도 락이다" draggable="false"><span id="title-fallback" hidden>화락제도<br><em>락이다</em></span></h1>
-        <div class="title-actions">
+        <div id="title-actions" class="title-actions">
           <button id="start-button" class="start-button" disabled><span id="start-label">무대 준비 중</span><span class="start-arrow" aria-hidden="true">↗</span></button>
           <button id="title-challenge-button" class="title-challenge-button" disabled>챌린지 모드 <span>2페이즈 바로 시작 ↗</span></button>
           <p class="title-key-hint">터치 · 클릭 또는 <kbd>R</kbd> 키로 시작</p>
@@ -57,11 +57,11 @@
         </div>
       </section>
       <section id="opening-screen" class="opening-screen overlay" aria-label="오프닝 영상">
-        <video id="opening-video" src="assets/optimized/opening.332aa5a62508.mp4" autoplay muted playsinline preload="auto" aria-label="수달의 화락제 오프닝 영상"></video>
+        <video id="opening-video" src="assets/optimized/opening.332aa5a62508.mp4" autoplay playsinline preload="auto" aria-label="수달의 화락제 오프닝 영상"></video>
         <div class="opening-tools">
-          <button id="opening-sound" class="cinema-button" aria-pressed="false">♫ 소리 켜기</button>
           <button id="opening-skip" class="cinema-button">건너뛰기 <span aria-hidden="true">↗</span></button>
         </div>
+        <p id="sound-hint" class="sound-hint" hidden>화면을 터치하면 소리도 함께 나와요.</p>
         <div id="opening-recovery" class="opening-recovery" hidden>
           <p id="opening-message">영상을 재생하려면 눌러주세요.</p>
           <button id="opening-play" class="cinema-button">영상 재생</button>
@@ -99,7 +99,7 @@
           <div class="result-main"><div><span id="result-score-label" class="metric-label">1페이즈 점수</span><div class="result-score" id="result-score">0</div><span class="score-caption" id="result-breakdown">기본 0 + Perfect 보너스 0</span></div><div class="result-grade" id="result-grade">A</div><div id="survival-result" hidden><span class="metric-label">버틴 시간</span><strong id="result-survival-time">00:00.0</strong></div></div>
           <div class="result-stats"><div><b id="result-combo">0</b><span>최대 콤보</span></div><div><b id="result-accuracy">0%</b><span>정확도</span></div></div>
           <div id="result-counts" class="result-counts"></div><p id="combined-result" class="combined-result" hidden></p>
-          <p id="challenge-rules" class="challenge-rules">2.0배속 출발 · Miss 누적 5회면 탈락</p>
+          <p id="challenge-rules" class="challenge-rules">1.6배속 출발 · Miss 누적 5회면 탈락</p>
           <div class="result-actions"><button id="challenge-button" class="primary">도전하기</button><button id="retry-button" class="secondary">처음부터 다시</button></div>
           <div class="record-actions"><button id="record-button" class="ranking-link">기록 저장하기</button></div>
         </div>

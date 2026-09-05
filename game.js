@@ -14,7 +14,7 @@
   const CODE_TO_LANE = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
   const POSE_MASK = { 1: 'D', 2: 'F', 4: 'J', 8: 'K', 9: 'DK', 6: 'FJ', 5: 'DJ', 10: 'FK' };
   const INTRO_DURATION = 3.5; // Three one-second Ready pumps, then half a second of Go.
-  const HIT_LIGHT_DURATION = .78;
+  const HIT_LIGHT_DURATION = .94;
   const NOTE_WIDTH = .116;
   const POSES = { normal: true, D: true, F: true, J: true, K: true, DK: true, FJ: true, DJ: true, FK: true, DF: true, JK: true };
   const ENCORE_POSES = ['DF', 'JK', 'DF', 'JK', 'FJ'];
@@ -30,12 +30,13 @@
   const storeSet = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
   let width = 1400, height = 800, phone = false, portrait = false, ready = false, session = null;
   let mode = 'opening', time = -INTRO_DURATION, baseTime = -INTRO_DURATION, anchor = 0, manual = false;
-  let openingPlayPending = false, revealTimer = null, titleLogoLoaded = false;
+  let openingPlayPending = false, openingMutedByPolicy = false, revealTimer = null, titleLogoLoaded = false;
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
   let intermissionElapsed = 0, phaseOneScore = 0, encoreBeat = -1, titleElapsed = 0;
-  let best = Math.max(0, Number(storeGet('hwarak-best-music-v3', '0')) || 0);
-  const audio = { ctx: null, gain: null, enabled: storeGet('hwarak-sound', 'true') !== 'false', nodes: new Set() };
+  let best = Math.max(0, Number(storeGet('hwarak-best-music-v4', '0')) || 0);
+  // Start each fresh visit with sound enabled; one switch controls all media.
+  const audio = { ctx: null, gain: null, enabled: true, nodes: new Set() };
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
   const lerp = (a, b, t) => a + (b - a) * t;
   const setText = (id, text) => { const el = $(id); if (el.textContent !== text) el.textContent = text; };
@@ -148,6 +149,13 @@
   }
   function titleHeroLayout() {
     const portrait = height > width;
+    if (portrait) {
+      const stageBounds = stage.getBoundingClientRect(), actions = $('title-actions').getBoundingClientRect();
+      const actionsTop = actions.height ? actions.top - stageBounds.top : height * .74;
+      const feet = Math.min(height * .64, actionsTop - Math.max(18, height * .035));
+      const head = Math.max(12, Math.min(width * .125, height * .087, (feet - height * .31) / 2.9));
+      return { x: width * .5, feet, head, figureHeight: head * 2.7 };
+    }
     const head = Math.min(height * (portrait && phone ? .062 : .11), width * (portrait ? .095 : .052));
     return { x: width * (portrait ? .5 : .20), feet: height * (portrait ? .94 : .79), head, figureHeight: head * 2.7 };
   }
@@ -356,12 +364,12 @@
     for (const effect of fx) {
       const elapsed = now - effect.start, age = clamp(elapsed / HIT_LIGHT_DURATION);
       const p = effect.position ? { x: effect.position.x * width, y: effect.position.y * height } : target(effect.lane);
-      const color = COLORS[effect.lane], size = Math.max(35, width * .07) * (effect.sizeFactor || 1), rise = height * (effect.riseFactor || .25);
+      const color = COLORS[effect.lane], size = Math.max(35, width * .078) * (effect.sizeFactor || 1), rise = height * (effect.riseFactor || .29);
       const fade = (1 - age) ** 1.5, flash = Math.exp(-elapsed * 14);
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       // A forceful contact flash stays on the line; fine particles carry the light upward.
-      bloom(p.x, p.y, size * (1.8 + age * .4), color, fade, .3);
-      bloom(p.x, p.y, size * 1.15, '#ffffff', flash + fade * .3, .14);
+      bloom(p.x, p.y, size * (1.9 + age * .45), color, fade, .33);
+      bloom(p.x, p.y, size * 1.25, '#ffffff', flash + fade * .36, .16);
       bloom(p.x, p.y, size * 1.9, '#ffffff', flash * .95, .035);
       const flare = ctx.createLinearGradient(p.x - size * 1.5, 0, p.x + size * 1.5, 0);
       flare.addColorStop(0, color + '00'); flare.addColorStop(.27, color);
@@ -379,9 +387,9 @@
         // Staggered tiny white-centered motes make a rich, natural spray of light.
         for (let i = 0; i < Math.min(effect.motes.length, quality.profile.motes); i++) {
           const { a, b, c } = effect.motes[i];
-          const delay = c * .12, life = .36 + a * .29, progress = (elapsed - delay) / life;
+          const delay = c * .10, life = .44 + a * .37, progress = (elapsed - delay) / life;
           if (progress < 0 || progress > 1) continue;
-          const drift = (a - .5) * size * (1.05 + progress * 1.45);
+          const drift = (a - .5) * size * (1.2 + progress * 1.7);
           const curl = Math.sin(progress * 5 + b * Math.PI * 2) * size * progress * .22;
           const x = p.x + drift + curl;
           const y = p.y - Math.sin(progress * Math.PI * .62) * rise * (.15 + b * .85);
@@ -448,10 +456,10 @@
   }
   function stopAudio(stopMusic = true) { if (stopMusic) music.stop(); for (const node of audio.nodes) { try { node.stop(); } catch {} } audio.nodes.clear(); }
   function updateSoundUI() {
-    const active = audio.enabled && audio.ctx?.state === 'running';
-    $('sound-toggle').setAttribute('aria-pressed', String(!!active));
-    $('sound-toggle').setAttribute('aria-label', active ? '음악 켜짐, 누르면 끄기' : '누르면 음악 켜기');
-    document.querySelector('.sound-label').textContent = active ? '음악 ON' : audio.enabled ? '음악 켜기' : '음악 OFF';
+    $('sound-toggle').setAttribute('aria-pressed', String(audio.enabled));
+    $('sound-toggle').setAttribute('aria-label', audio.enabled ? '영상과 음악 소리 끄기' : '영상과 음악 소리 켜기');
+    document.querySelector('.sound-label').textContent = audio.enabled ? '소리 끄기' : '소리 켜기';
+    visible('sound-hint', mode === 'opening' && audio.enabled && openingMutedByPolicy);
   }
   function onJudge(event) {
     if (event.judgement === 'stray') return;
@@ -497,6 +505,7 @@
   }
   function setMode(next) {
     mode = next; stage.dataset.mode = mode;
+    updateSoundUI();
     stage.dataset.phase = String(session?.phase || 1);
     visible('opening-screen', mode === 'opening' || mode === 'revealing');
     visible('title-screen', mode === 'title' || mode === 'revealing');
@@ -558,6 +567,13 @@
       if (mode !== 'opening' || document.hidden) openingVideo.pause();
     }).catch(error => {
       if (error.name === 'AbortError' || mode !== 'opening') return;
+      if (error.name === 'NotAllowedError' && !openingVideo.muted) {
+        // Keep the opening moving if the browser requires a gesture for audio.
+        // The shared enabled preference stays on and the next gesture unmutes it.
+        openingMutedByPolicy = true; openingVideo.muted = true; updateSoundUI();
+        return openingVideo.play().then(() => { visible('opening-recovery', false); if (mode !== 'opening' || document.hidden) openingVideo.pause(); })
+          .catch(() => { setText('opening-message', '영상을 재생하려면 눌러주세요.'); visible('opening-recovery', true); });
+      }
       setText('opening-message', error.name === 'NotAllowedError' ? '영상을 재생하려면 눌러주세요.' : '영상을 재생하지 못했어요. 다시 재생하거나 시작 화면으로 이동할 수 있어요.');
       visible('opening-recovery', true);
     }).finally(() => { openingPlayPending = false; });
@@ -654,14 +670,14 @@
     const survival = session.phase === 2;
     const accuracy = session.accuracy, grade = accuracy >= 95 ? 'S' : accuracy >= 85 ? 'A' : accuracy >= 70 ? 'B' : 'C';
     const newBest = !survival && session.score > best;
-    if (newBest) { best = session.score; storeSet('hwarak-best-music-v3', best); }
+    if (newBest) { best = session.score; storeSet('hwarak-best-music-v4', best); }
     setText('result-title', survival ? '여기까지, 멋진 도전!' : '1페이즈 클리어!');
     setText('result-eyebrow', survival ? 'SURVIVAL RESULT' : 'READY FOR THE NEXT STAGE?');
     setText('result-score-label', survival ? '2페이즈 점수' : '1페이즈 점수');
     visible('result-grade', !survival); visible('survival-result', survival);
     setText('result-survival-time', formatTime(session.endTime || 0, true));
     setText('challenge-button', survival ? '도전 다시하기' : '도전하기');
-    setText('challenge-rules', survival ? `MISS 5 / 5 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '2.0배속 출발 · 1분마다 +1.0배속 · Miss 누적 5회면 탈락');
+    setText('challenge-rules', survival ? `MISS 5 / 5 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '1.6배속 출발 · 90초마다 +1.0배속 · Miss 누적 5회면 탈락');
     visible('combined-result', survival);
     setText('combined-result', `1페이즈 ${phaseOneScore.toLocaleString('ko-KR')}점 · 합산 ${(phaseOneScore + session.score).toLocaleString('ko-KR')}점`);
     setText('result-grade', grade); setText('result-score', session.score.toLocaleString('ko-KR'));
@@ -735,7 +751,7 @@
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); staticLayers.clear(); quality.reset();
     }
     pads.forEach((pad, lane) => {
-      const p = target(lane), w = width * .23, top = p.y - Math.max(16, height * .032);
+      const p = target(lane), w = width * .23, top = p.y - Math.max(36, height * .08);
       Object.assign(pad.style, { left: `${bounds.left - stageBounds.left + p.x - w / 2}px`, top: `${bounds.top - stageBounds.top + top}px`, width: `${w}px`, height: `${height - top}px`, paddingTop: `${p.y - top}px`, '--lane-color': COLORS[lane] });
     });
     render(performance.now() / 1000);
@@ -806,27 +822,27 @@
     if (openingVideo.error) openingVideo.load();
     syncOpeningPlayback();
   });
-  $('opening-sound').addEventListener('click', () => {
-    openingVideo.muted = !openingVideo.muted;
-    $('opening-sound').setAttribute('aria-pressed', String(!openingVideo.muted));
-    setText('opening-sound', openingVideo.muted ? '♫ 소리 켜기' : '♫ 소리 끄기');
-    syncOpeningPlayback();
-  });
   $('retry-button').addEventListener('click', () => launchGame());
   $('challenge-button').addEventListener('click', () => { if (mode === 'result') { launchGame(2); } });
   $('restart-pause').addEventListener('click', () => launchGame());
   $('pause-button').addEventListener('click', () => pauseGame()); $('resume-button').addEventListener('click', resumeGame);
   $('sound-toggle').addEventListener('click', () => {
-    if (audio.enabled && audio.ctx?.state !== 'running') { initAudio(); return; }
-    audio.enabled = !audio.enabled; storeSet('hwarak-sound', audio.enabled); stopAudio(false); music.setEnabled(audio.enabled);
-    if (audio.enabled) initAudio(); updateSoundUI();
+    audio.enabled = !audio.enabled; openingMutedByPolicy = false;
+    openingVideo.muted = !audio.enabled; stopAudio(false); music.setEnabled(audio.enabled);
+    if (audio.enabled) { initAudio(); if (mode === 'opening') syncOpeningPlayback(); }
+    updateSoundUI();
   });
   const unlockAudio = event => {
-    if (mode !== 'playing' && mode !== 'title' && mode !== 'resuming') return;
     if (event.target.closest?.('#sound-toggle')) return;
+    if (mode === 'opening' && audio.enabled) {
+      openingMutedByPolicy = false; openingVideo.muted = false;
+      syncOpeningPlayback(); updateSoundUI();
+    }
     if (audio.enabled && audio.ctx?.state !== 'running') initAudio();
   };
   document.addEventListener('pointerdown', unlockAudio, { passive: true });
+  document.addEventListener('touchend', unlockAudio, { passive: true });
+  document.addEventListener('click', unlockAudio, { passive: true });
   document.addEventListener('keydown', unlockAudio);
   $('fullscreen').hidden = !stage.requestFullscreen || document.fullscreenEnabled === false;
   $('fullscreen').addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else if (stage.requestFullscreen) await stage.requestFullscreen(); } catch {} });
@@ -855,7 +871,7 @@
     speed: +C.speedAt(Math.max(0, time), session?.phase || 1).toFixed(3),
     notes: session?.visible(time).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit, spawn: +n.spawn.toFixed(3), travel: +n.travel.toFixed(3), partial: Object.keys(n.inputs).map(l => C.KEYS[l]) })) || [],
     next: session?.chart.filter(n => !n.resolved && n.hit > time).slice(0, 4).map(n => ({ id: n.id, keys: n.lanes.map(l => C.KEYS[l]), hit: n.hit })) || [],
-    music: music.snapshot(),
+    music: music.snapshot(), sound: { enabled: audio.enabled, videoBlocked: openingMutedByPolicy },
     coordinates: `Canvas origin top-left. Notes emerge at center x, ${portrait ? 53.5 : 59}% height near the front-stage otter; targets at 84.5% height.`
   });
   window.advanceTime = ms => {

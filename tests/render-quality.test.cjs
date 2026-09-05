@@ -15,7 +15,7 @@ test('sustained slow rendering lowers quality in steps without oscillation', () 
   assert.equal(q.profile.name, 'balanced');
   sample(q, 40, 5700); assert.equal(q.profile.name, 'light');
   sample(q, 16.67, 30000); assert.equal(q.profile.name, 'light'); assert.equal(q.changes, 2);
-  assert.equal(q.profile.motes, 76); assert.equal(q.ratio(844, 320, 3), 1);
+  assert.equal(q.profile.motes, 96); assert.equal(q.ratio(844, 320, 3), 1);
 });
 test('short spikes, inactive time and tab suspension do not lower quality', () => {
   const q = new Controller(); sample(q, 16.67, 4000); sample(q, 70, 600); sample(q, 16.67, 5000);

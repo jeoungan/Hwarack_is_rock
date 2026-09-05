@@ -129,6 +129,7 @@ body[data-phone=true] .clear-cue strong{font-size:10px;line-height:1.25;margin-t
 .device-guide strong,.device-guide span{display:block;font-weight:500}
 .device-guide span{color:#9cf9ff}
 .title-actions{flex-shrink:0}
+.sound-hint{position:absolute;bottom:20px;left:12px;right:12px;margin:0;text-align:center;color:#fff;font-size:13px;text-shadow:0 1px 6px #000;pointer-events:none}
 body[data-phone=true]{overscroll-behavior:none}
 body[data-phone=true] .app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 body[data-phone=true] .stage{height:calc(100vh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));height:calc(100dvh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
@@ -218,3 +219,8 @@ body[data-phone=true][data-portrait=true] .record-actions .ranking-link{min-heig
   body[data-phone=true][data-portrait=true] .result-actions{gap:7px;margin-top:10px}
   body[data-phone=true][data-portrait=true] .record-actions{margin-top:8px}
 }
+
+/* Portrait title order: logo, dancing otter, then the two start buttons. */
+@media(orientation:portrait){.title-screen{padding-bottom:24px}.title-art{flex:none;height:32%;max-height:none}.title-actions{margin-top:auto;margin-bottom:0}}
+body[data-phone=true][data-portrait=true] .title-art{height:28%}
+body[data-phone=true][data-portrait=true] .title-actions{margin-top:auto}

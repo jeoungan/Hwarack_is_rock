@@ -1,9 +1,9 @@
 (function (root) {
   'use strict';
   const profiles = Object.freeze([
-    Object.freeze({ name: 'high', dpr: 2, maxPixels: 3000000, motes: 148, dust: 22 }),
-    Object.freeze({ name: 'balanced', dpr: 1.5, maxPixels: 1700000, motes: 108, dust: 16 }),
-    Object.freeze({ name: 'light', dpr: 1, maxPixels: 1000000, motes: 76, dust: 12 })
+    Object.freeze({ name: 'high', dpr: 2, maxPixels: 3000000, motes: 208, dust: 22 }),
+    Object.freeze({ name: 'balanced', dpr: 1.5, maxPixels: 1700000, motes: 144, dust: 16 }),
+    Object.freeze({ name: 'light', dpr: 1, maxPixels: 1000000, motes: 96, dust: 12 })
   ]);
   class Controller {
     constructor() { this.level = 0; this.changes = 0; this.reset(); }
