@@ -48,25 +48,32 @@
   function travelAt(time, phase = 1) { return 2.4 / speedAt(time, phase); }
   function noteGenerator(seed, phase) {
     const rng = random(seed);
-    let singles = [], pairs = [], id = 0, challengeCount = 0, beatIndex = track.firstBeat;
-    const nextSingle = () => {
-      if (!singles.length) singles = shuffle([0, 1, 2, 3], rng);
-      return [singles.pop()];
+    let singles = [], pairs = [], id = 0, challengeCount = 0, beatIndex = track.firstBeat, previous = null;
+    const nextSingle = excluded => {
+      if (!singles.some(lane => !excluded.includes(lane))) singles = shuffle([0, 1, 2, 3], rng);
+      const index = singles.findLastIndex(lane => !excluded.includes(lane));
+      return singles.splice(index, 1);
     };
     return () => {
       const hit = +(BEAT_OFFSET + beatIndex * BEAT).toFixed(6);
       const travel = travelAt(hit, phase);
       const spawn = hit - travel;
-      let lanes = nextSingle();
+      // Half-beat windows overlap by 20ms. Alternate hands/lanes so a late
+      // input for one note can never be assigned to its early neighbour.
+      const excluded = previous && hit - previous.hit < BEAT - 1e-6 ? previous.lanes : [];
+      let lanes = nextSingle(excluded);
       if (phase === 2 || spawn >= PRACTICE) {
         const chance = phase === 2 ? .54 : 0.24 + 0.30 * clamp((hit - PRACTICE) / (DURATION - PRACTICE));
         if (challengeCount++ === 0 || rng() < chance) {
-          if (!pairs.length) pairs = shuffle(PAIRS, rng);
-          lanes = pairs.pop().slice();
+          const compatible = pair => pair.every(lane => !excluded.includes(lane));
+          if (!pairs.some(compatible)) pairs = shuffle(PAIRS.filter(compatible), rng);
+          lanes = pairs.splice(pairs.findLastIndex(compatible), 1)[0].slice();
         }
       }
       const note = { id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {} };
-      beatIndex += phase === 2 || spawn >= PRACTICE ? 1 : 2;
+      // The track has strong attacks on both the beat and the eighth-note offbeat.
+      beatIndex += phase === 2 || spawn >= PRACTICE ? .5 : 1;
+      previous = note;
       return note;
     };
   }
@@ -147,7 +154,7 @@
         this.combo++;
         this.maxCombo = Math.max(this.combo, this.maxCombo);
       }
-      if (this.phase === 2 && POINTS[judgement] < POINTS.special) {
+      if (this.phase === 2 && judgement === 'miss') {
         this.failures++;
         if (this.failures >= FAILURE_LIMIT) {
           this.finished = true; this.endTime = Math.max(0, this.time); this.endReason = 'eliminated';

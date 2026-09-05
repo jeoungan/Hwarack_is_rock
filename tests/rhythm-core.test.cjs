@@ -8,7 +8,7 @@ test('100 random charts preserve the practice boundary, beat grid, supported cho
     const chart = C.createChart(seed);
     assert.deepEqual(chart.slice(0, 4).map(note => note.lanes[0]).sort(), [0, 1, 2, 3]);
     assert.ok(chart.some(note => note.lanes.length === 2));
-    assert.ok(chart.every(note => note.spawn >= 0 && note.hit < 120 && Math.abs((note.hit - C.BEAT_OFFSET) / C.BEAT - Math.round((note.hit - C.BEAT_OFFSET) / C.BEAT)) < 1e-8));
+    assert.ok(chart.every(note => note.spawn >= 0 && note.hit < 120 && Math.abs((note.hit - C.BEAT_OFFSET) / (C.BEAT / 2) - Math.round((note.hit - C.BEAT_OFFSET) / (C.BEAT / 2))) < 1e-8));
     assert.ok(chart.filter(note => note.spawn < 15).every(note => note.lanes.length === 1));
     assert.ok(chart.every(note => note.lanes.length === 1 || valid.has(note.lanes.join(','))));
     for (let i = 1; i < chart.length; i++) {
@@ -117,19 +117,19 @@ test('all chords cross the two hands and phase-one speed reaches exactly 2x at 1
   for (const [time, speed] of [[0, 2], [30, 2.5], [60, 3], [120, 4], [600, 12]]) assert.equal(C.speedAt(time, 2), speed);
 });
 
-test('survival counts Great/Good/Miss cumulatively; Perfect/Special do not restore lives', () => {
+test('survival ends at exactly five Misses; every successful grade preserves remaining lives', () => {
   const s = new C.Session(42, () => {}, { phase: 2 });
-  const offsets = [.10, .06, .14, 0, .17, .08, .10, .14];
+  const offsets = [.10, .06, .14, 0, .17, .08, .10, .14, .17, .10, .17, .14, .17, 0, .17];
   let failures = 0;
   for (const offset of offsets) {
     const n = s.chart.find(n => !n.resolved);
     if (offset > C.GOOD) s.advance(n.hit + offset); else hit(s, n, offset);
-    if (offset > C.SPECIAL) failures++;
+    if (offset > C.GOOD) failures++;
     assert.equal(s.failures, failures);
     assert.equal(s.finished, failures === 5);
   }
   assert.equal(s.endReason, 'eliminated');
-  assert.equal(s.counts.great, 2); assert.equal(s.counts.good, 2); assert.equal(s.counts.miss, 1);
+  assert.equal(s.counts.great, 3); assert.equal(s.counts.good, 3); assert.equal(s.counts.miss, 5);
   const frozen = { score: s.score, endTime: s.endTime, counts: { ...s.counts } };
   s.advance(600); s.press(0, 601); s.resolve(s.chart.find(n => !n.resolved), 'perfect', 0);
   assert.deepEqual({ score: s.score, endTime: s.endTime, counts: s.counts }, frozen);
@@ -143,7 +143,7 @@ test('a failed two-key chord consumes one life; late input cannot score after th
   assert.equal(s.failures, 1); assert.equal(s.score, 1);
   s.press(0, 100);
   assert.equal(s.failures, 5); assert.equal(s.score, 5); assert.equal(s.counts.stray, 0);
-  assert.ok(Math.abs(s.endTime - (C.FIRST_HIT + 4 * C.BEAT + C.GOOD)) < 1e-8); assert.equal(s.time, s.endTime);
+  assert.ok(Math.abs(s.endTime - (C.FIRST_HIT + 4 * C.BEAT / 2 + C.GOOD)) < 1e-8); assert.equal(s.time, s.endTime);
 });
 
 test('empty input cannot farm survival points or consume a note failure', () => {
@@ -157,7 +157,7 @@ test('ten minutes of survival generate fresh notes on the beat with bounded memo
   let count = 0, lastHit = 0;
   while (lastHit < 600) {
     const n = s.chart.find(n => !n.resolved);
-    assert.ok(n); assert.ok(n.hit > lastHit); assert.ok(Math.abs((n.hit - C.BEAT_OFFSET) / C.BEAT - Math.round((n.hit - C.BEAT_OFFSET) / C.BEAT)) < 1e-8);
+    assert.ok(n); assert.ok(n.hit > lastHit); assert.ok(Math.abs((n.hit - C.BEAT_OFFSET) / (C.BEAT / 2) - Math.round((n.hit - C.BEAT_OFFSET) / (C.BEAT / 2))) < 1e-8);
     assert.ok(n.lanes.length === 1 || C.PAIRS.some(pair => pair.join() === n.lanes.join()));
     assert.ok(n.travel <= 1.2); assert.ok(s.chart.length < 24);
     hit(s, n); lastHit = n.hit; count++;
@@ -179,12 +179,24 @@ test('before the first note and between notes, empty taps never emit a judgement
   assert.deepEqual({ score: s.score, combo: s.combo, bonus: s.bonusScore, accuracy: s.accuracy }, before);
   hit(s, s.chart[6]); assert.equal(s.bonusScore, 2); assert.equal(s.counts.stray, 0);
 });
-test('music chart v2 has 182 judgements and leaves enough time for the final late window', () => {
-  assert.equal(C.PRACTICE, 15); assert.equal(C.CHART_VERSION, 2); assert.equal(C.BEAT, .6);
+test('music chart v3 doubles density and leaves enough time for the final late window', () => {
+  assert.equal(C.PRACTICE, 15); assert.equal(C.CHART_VERSION, 3); assert.equal(C.BEAT, .6);
   for (const seed of [1, 42, 999]) {
     const chart = C.createChart(seed);
-    assert.equal(chart.length, 182); assert.equal(chart[0].hit, 2.865);
+    assert.equal(chart.length, 365); assert.equal(chart[0].hit, 2.865);
     assert.ok(chart.at(-1).hit + C.GOOD < C.DURATION);
     assert.ok(chart.some(n => n.spawn >= 15 && n.spawn < 18 && n.lanes.length === 2));
+  }
+});
+
+test('dense notes alternate lanes, including every chord, across 100 seeds and both phases', () => {
+  for (let seed = 0; seed < 100; seed++) for (const phase of [1, 2]) {
+    const s = new C.Session(seed, () => {}, { phase });
+    if (phase === 2) s.fillAhead(120);
+    for (let i = 1; i < s.chart.length; i++) {
+      const a = s.chart[i - 1], b = s.chart[i], gap = b.hit - a.hit;
+      assert.ok(Math.abs(gap - (phase === 1 && a.spawn < 15 ? .6 : .3)) < 1e-8);
+      if (gap < .31) assert.ok(b.lanes.every(lane => !a.lanes.includes(lane)));
+    }
   }
 });

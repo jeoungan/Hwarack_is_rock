@@ -50,6 +50,10 @@ body[data-phone=true] .key-pad b{font-size:20px}
 .start-button:not(:disabled):hover{transform:translateY(-3px);filter:brightness(1.1);box-shadow:0 8px 0 #aa6d22,0 0 42px #ffe65075}
 .start-button:not(:disabled):active{transform:translateY(3px);box-shadow:0 2px 0 #aa6d22,0 0 25px #ffdf4080}
 .start-button:focus-visible{outline-color:#8dffff;outline-offset:7px}
+.title-challenge-button{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;min-height:50px;margin-top:14px;padding:10px 14px;border:1px solid #65f6efb0;border-radius:7px;background:linear-gradient(115deg,#153b50f0,#392259f0);color:#dfffff;font-size:17px;font-weight:800;box-shadow:0 3px 0 #101a38,0 0 20px #3fedee20;transition:filter .16s,transform .16s}
+.title-challenge-button span{font-size:11px;font-weight:500;color:#aaf8f6}
+.title-challenge-button:not(:disabled):hover{filter:brightness(1.25);transform:translateY(-1px)}
+.title-challenge-button:focus-visible{outline:2px solid #8dffff;outline-offset:5px}
 .start-arrow{font-size:28px;font-weight:500;line-height:1}
 .title-key-hint{margin:17px 0 0;color:#e3d5f1;font-size:12px;letter-spacing:.5px;text-shadow:0 2px 6px #08021a}
 .title-key-hint kbd{display:inline-block;margin:0 5px;padding:3px 8px;font-size:12px;border-color:#c6a4e2;background:#261438b8;color:#fff}
@@ -77,10 +81,12 @@ body[data-phone=true] .key-pad b{font-size:20px}
 @keyframes title-hover{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
 @keyframes start-arrive{from{opacity:0;transform:translateY(17px)}to{opacity:1;transform:translateY(0)}}
 body[data-phone=true] .title-screen{gap:5px;padding:9px 16px 12px}
-body[data-phone=true] .title-art{height:65%;width:min(70%,490px)}
+body[data-phone=true] .title-art{height:46%;width:min(70%,490px)}
 body[data-phone=true] .title-actions{width:240px;max-width:60%}
 body[data-phone=true] .start-button{font-size:18px;min-height:43px;padding:8px 20px;gap:35px}
 body[data-phone=true] .start-arrow{font-size:23px}
+body[data-phone=true] .title-challenge-button{min-height:44px;margin-top:9px;font-size:14px;gap:9px;padding:7px 10px}
+body[data-phone=true] .title-challenge-button span{font-size:10px}
 body[data-phone=true] .title-key-hint{font-size:9px;margin-top:10px}
 body[data-phone=true] .title-key-hint kbd{font-size:9px;padding:1px 6px}
 body[data-phone=true] .opening-tools{top:10px;right:12px;gap:7px}
@@ -175,7 +181,7 @@ body[data-phone=true][data-portrait=true] .key-pad{flex-direction:column;gap:4px
 body[data-phone=true][data-portrait=true] .key-pad b{font-size:25px}
 body[data-phone=true][data-portrait=true] .key-pad span{display:block;font-size:9px;white-space:nowrap}
 body[data-phone=true][data-portrait=true] .title-screen{justify-content:flex-start;padding:5% 16px 18px;gap:18px}
-body[data-phone=true][data-portrait=true] .title-art{flex:none;width:100%;height:36%;max-height:none}
+body[data-phone=true][data-portrait=true] .title-art{flex:none;width:100%;height:32%;max-height:none}
 body[data-phone=true][data-portrait=true] .title-actions{width:min(340px,94%);max-width:none}
 body[data-phone=true][data-portrait=true] .start-button{min-height:54px;font-size:21px}
 body[data-phone=true][data-portrait=true] .title-key-hint{font-size:11px;margin-top:12px}

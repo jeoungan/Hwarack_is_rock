@@ -16,6 +16,7 @@
   const INTRO_DURATION = 3.5; // Three one-second Ready pumps, then half a second of Go.
   const HIT_LIGHT_DURATION = .78;
   const NOTE_WIDTH = .116;
+  const NOTE_DEPTH = .28;
   const POSES = { normal: true, D: true, F: true, J: true, K: true, DK: true, FJ: true, DJ: true, FK: true, DF: true, JK: true };
   const ENCORE_POSES = ['DF', 'JK', 'DF', 'JK', 'FJ'];
   const textures = {};
@@ -34,7 +35,7 @@
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
   let intermissionElapsed = 0, phaseOneScore = 0, encoreBeat = -1, titleElapsed = 0;
-  let best = Math.max(0, Number(storeGet('hwarak-best-music-v2', '0')) || 0);
+  let best = Math.max(0, Number(storeGet('hwarak-best-music-v3', '0')) || 0);
   const audio = { ctx: null, gain: null, enabled: storeGet('hwarak-sound', 'true') !== 'false', nodes: new Set() };
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -71,7 +72,8 @@
     // The leading edge reaches the line at the hit time. Late-input grace never
     // carries the solid note below the line.
     const p = projection(lane, Math.min(1, u));
-    return { ...p, w: width * NOTE_WIDTH * p.scale, h: Math.max(2.3, Math.min(height * .009, width * .012) * p.scale) };
+    return { ...p, w: width * NOTE_WIDTH * p.scale,
+      h: Math.max(.7, Math.max(7, Math.min(18, height * .022, width * .036)) * p.scale) };
   }
 
 
@@ -337,16 +339,41 @@
     for (const lane of pending) {
       const p = noteShape(lane, u), { w, h } = p;
       const cy = p.y - h / 2;
-      bloom(p.x, cy, w * .66, COLORS[lane], .8, .13);
-      const tail = noteShape(lane, Math.max(0, Math.min(1, u) - .03));
-      const trail = ctx.createLinearGradient(tail.x, tail.y, p.x, cy);
-      trail.addColorStop(0, COLORS[lane] + '00'); trail.addColorStop(1, COLORS[lane] + '50');
-      poly([[tail.x - tail.w * .35, tail.y - h], [tail.x + tail.w * .35, tail.y - h], [p.x + w * .4, cy], [p.x - w * .4, cy]], trail);
+      bloom(p.x, cy, w * .7, COLORS[lane], .72, Math.max(.16, h / w));
+      // A long solid top recedes along this lane toward the vanishing point.
+      // It is still one tap: the entire body is consumed at the front edge.
+      // Keep a visible gap before the next note on this lane at the denser tempo.
+      const depth = Math.min(NOTE_DEPTH, .40 / note.travel);
+      const back = noteShape(lane, Math.max(0, Math.min(1, u) - depth));
+      const left = [p.x - w / 2, p.y - h], right = [p.x + w / 2, p.y - h];
+      const backLeft = [back.x - back.w / 2, back.y - back.h];
+      const backRight = [back.x + back.w / 2, back.y - back.h];
+      ctx.save(); ctx.shadowColor = COLORS[lane]; ctx.shadowBlur = Math.max(3, 7 * p.scale);
+      poly([backLeft, left, [left[0], p.y], [backLeft[0], back.y]], COLORS[lane] + 'b0');
+      poly([backRight, right, [right[0], p.y], [backRight[0], back.y]], COLORS[lane] + 'd0');
+      const top = ctx.createLinearGradient(back.x, backLeft[1], p.x, left[1]);
+      top.addColorStop(0, COLORS[lane] + 'd9'); top.addColorStop(.6, COLORS[lane]); top.addColorStop(1, '#eaffff');
+      poly([backLeft, backRight, right, left], top, COLORS[lane], Math.max(.7, p.scale * 1.2));
+      ctx.shadowBlur = 0;
+      // Wide reflected faces follow the top surface instead of a trailing glow.
+      const surface = (across, depth) => [lerp(lerp(backLeft[0], backRight[0], across), lerp(left[0], right[0], across), depth),
+        lerp(backLeft[1], left[1], depth)];
+      poly([surface(0, 0), surface(.38, 0), surface(.73, .62), surface(.21, .83), surface(0, .54)], '#ffffff45');
+      poly([surface(1, .38), surface(1, .75), surface(.52, 1), surface(.13, 1)], '#ffffff70');
+      ctx.restore();
       const fill = ctx.createLinearGradient(0, p.y - h, 0, p.y);
-      fill.addColorStop(0, COLORS[lane]); fill.addColorStop(.5, '#f9ffff'); fill.addColorStop(1, COLORS[lane]);
+      fill.addColorStop(0, '#efffff'); fill.addColorStop(.18, COLORS[lane]);
+      fill.addColorStop(.75, COLORS[lane]); fill.addColorStop(1, '#ffffff');
       ctx.save(); ctx.shadowColor = COLORS[lane]; ctx.shadowBlur = Math.max(5, 11 * p.scale);
       ctx.fillStyle = fill; ctx.beginPath();
-      ctx.roundRect(p.x - w / 2, p.y - h, w, h, Math.min(3, h / 2)); ctx.fill();
+      ctx.roundRect(p.x - w / 2, p.y - h, w, h, Math.min(w * .12, h * .25)); ctx.fill();
+      // Broad glossy faces give the note a solid body; the leading edge stays at p.y.
+      ctx.shadowBlur = 0; ctx.clip();
+      poly([[p.x - w / 2, p.y - h], [p.x + w * .13, p.y - h],
+        [p.x - w * .04, p.y - h * .34], [p.x - w / 2, p.y - h * .58]], '#ffffff65');
+      poly([[p.x + w * .1, p.y - h * .08], [p.x + w / 2, p.y - h * .76],
+        [p.x + w / 2, p.y], [p.x - w * .13, p.y]], '#ffffff80');
+      rect(p.x - w / 2, p.y - h * .25, w, h * .13, '#080a3020');
       ctx.restore();
     }
     ctx.restore();
@@ -501,6 +528,7 @@
     visible('opening-screen', mode === 'opening' || mode === 'revealing');
     visible('title-screen', mode === 'title' || mode === 'revealing');
     $('start-button').disabled = !ready || mode !== 'title';
+    $('title-challenge-button').disabled = !ready || mode !== 'title';
     visible('pause', mode === 'paused'); visible('result', mode === 'result');
     const game = !!session;
     for (const id of ['hud', 'round-progress', 'beat-indicator', 'key-pads']) visible(id, game);
@@ -514,13 +542,13 @@
     visible('title-impact', false);
     stopAudio(); clearInputs(); fx = []; feedback = null; phaseAnnounced = false;
     intermissionElapsed = 0; encoreBeat = -1;
-    if (phase === 1) phaseOneScore = 0;
+    if (phase === 1 || mode === 'title') phaseOneScore = 0;
     time = -INTRO_DURATION; baseTime = -INTRO_DURATION; anchor = performance.now(); manual = false; pose = 'normal'; lastHitTime = -99;
     session = new C.Session(seed, onJudge, { phase });
     window.HwarakLeaderboard?.begin(session.seed, phase);
     music.start(time);
     setMode('playing'); updateHUD();
-    $('game-status').textContent = phase === 2 ? '2페이즈 도전. Special 이상으로 버티세요. 다섯 번째 실수에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
+    $('game-status').textContent = phase === 2 ? '2페이즈 도전. Miss 누적 다섯 번에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
   }
   function resetDepartedGame() {
     // A restored mobile tab can keep this entire JS session alive. Discard the
@@ -653,14 +681,14 @@
     const survival = session.phase === 2;
     const accuracy = session.accuracy, grade = accuracy >= 95 ? 'S' : accuracy >= 85 ? 'A' : accuracy >= 70 ? 'B' : 'C';
     const newBest = !survival && session.score > best;
-    if (newBest) { best = session.score; storeSet('hwarak-best-music-v2', best); }
+    if (newBest) { best = session.score; storeSet('hwarak-best-music-v3', best); }
     setText('result-title', survival ? '여기까지, 멋진 도전!' : '1페이즈 클리어!');
     setText('result-eyebrow', survival ? 'SURVIVAL RESULT' : 'READY FOR THE NEXT STAGE?');
     setText('result-score-label', survival ? '2페이즈 점수' : '1페이즈 점수');
     visible('result-grade', !survival); visible('survival-result', survival);
     setText('result-survival-time', formatTime(session.endTime || 0, true));
     setText('challenge-button', survival ? '도전 다시하기' : '도전하기');
-    setText('challenge-rules', survival ? `5 / 5 실수 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '2.0배속 출발 · 1분마다 +1.0배속 · Special 미만 누적 5회면 탈락');
+    setText('challenge-rules', survival ? `MISS 5 / 5 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '2.0배속 출발 · 1분마다 +1.0배속 · Miss 누적 5회면 탈락');
     visible('combined-result', survival);
     setText('combined-result', `1페이즈 ${phaseOneScore.toLocaleString('ko-KR')}점 · 합산 ${(phaseOneScore + session.score).toLocaleString('ko-KR')}점`);
     setText('result-grade', grade); setText('result-score', session.score.toLocaleString('ko-KR'));
@@ -683,10 +711,10 @@
     const encore = mode === 'intermission';
     setText('combo', encore ? '끝까지 해냈다!' : session.combo ? `${session.combo} COMBO!` : elapsed < C.FIRST_HIT ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
     setText('phase-label', encore ? 'ENCORE' : survival ? 'SURVIVAL' : practice ? 'WARM UP' : 'PHASE 1'); setText('phase-title', encore ? '앙코르!' : survival ? '2페이즈 도전' : practice ? '연습 무대' : '본무대');
-    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `실수 ${session.failures} / 5 · Special 이상!` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(C.PRACTICE - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
+    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `MISS ${session.failures} / 5` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(C.PRACTICE - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
     visible('survival-lives', survival);
     [...$('survival-lives').children].forEach((life, i) => life.classList.toggle('lost', i < session.failures));
-    $('survival-lives').setAttribute('aria-label', `실수 ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
+    $('survival-lives').setAttribute('aria-label', `Miss ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
     setText('speed', `SPEED ×${C.speedAt(elapsed, session.phase).toFixed(2)}`);
     $('round-progress-fill').style.width = `${survival ? (1 - session.failures / C.FAILURE_LIMIT) * 100 : clamp(elapsed / C.DURATION) * 100}%`;
     const beat = ((Math.floor((elapsed - C.BEAT_OFFSET) / C.BEAT) % 4) + 4) % 4;
@@ -789,6 +817,7 @@
   });
   window.addEventListener('resize', checkOrientation); document.addEventListener('fullscreenchange', resize);
   $('start-button').addEventListener('click', startFromTitle);
+  $('title-challenge-button').addEventListener('click', () => { if (mode === 'title' && ready) launchGame(2); });
   openingVideo.addEventListener('ended', finishOpening);
   openingVideo.addEventListener('error', () => {
     if (mode !== 'opening') return;
@@ -906,7 +935,7 @@
     const image = new Image(); image.src = assets[`character/skeleton-${name}.png`];
     await image.decode(); skeletonTextures[name] = image;
   }), titleImageReady, (async () => { const background = new Image(); background.src = assets['assets/neon-festival.png']; await background.decode(); textures.background = background; staticLayers.delete('background'); })()]).then(() => {
-    ready = true; setText('start-label', '시작하기'); $('start-button').disabled = mode !== 'title';
+    ready = true; setText('start-label', '시작하기'); $('title-challenge-button').disabled = mode !== 'title'; $('start-button').disabled = mode !== 'title';
   }).catch(error => { visible('load-error', true); setText('load-error', '무대 이미지를 불러오지 못했어요. character와 assets 폴더가 게임과 함께 있는지 확인해주세요.'); console.error('Stage loading failed:', error); });
   requestAnimationFrame(frame);
 })();
