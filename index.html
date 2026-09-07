@@ -40,7 +40,7 @@
     <header class="topbar">
       <div class="brand-navigation">
         <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><strong>HWARAK<span>LIVE</span></strong><span class="brand-caption">오늘 무대의 주인공, 너.</span></div>
-        <nav class="game-navigation" aria-label="게임 메뉴"><a id="ranking-tab" class="ranking-tab" href="https://hwarak-records.web.app/" target="_blank" rel="noopener noreferrer">순위 확인하기 <span aria-hidden="true">↗</span><span class="sr-only"> (새 탭)</span></a></nav>
+        <nav class="game-navigation" aria-label="게임 메뉴"><button id="ranking-tab" class="ranking-tab" type="button" aria-haspopup="dialog" aria-controls="ranking-modal">순위 확인하기 <span aria-hidden="true">≡</span></button></nav>
       </div>
       <div class="tools">
         <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="영상과 음악 소리 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">소리 끄기</span></button>
@@ -124,6 +124,15 @@
       <button id="record-submit" class="record-submit" type="submit">기록 저장하기 <span aria-hidden="true">↗</span></button>
       <p id="record-status" class="record-status" role="status"></p>
     </form>
+  </dialog>
+  <dialog id="ranking-modal" class="leaderboard-modal ranking-modal" aria-labelledby="ranking-heading">
+    <header class="inline-ranking-head"><div><span class="eyebrow">HWARAK LIVE · TOP 10</span><h2 id="ranking-heading">오늘의 순위</h2></div><div class="inline-ranking-tools"><button id="ranking-refresh" type="button">새로고침</button><button id="ranking-close" class="leaderboard-close" type="button" aria-label="순위 닫기">×</button></div></header>
+    <div class="inline-ranking-tabs" role="tablist" aria-label="순위 페이즈"><button id="ranking-tab-1" type="button" role="tab" aria-selected="true" aria-controls="ranking-panel-1" data-ranking-phase="1">1페이즈 · 점수</button><button id="ranking-tab-2" type="button" role="tab" aria-selected="false" aria-controls="ranking-panel-2" tabindex="-1" data-ranking-phase="2">2페이즈 · 생존</button></div>
+    <div class="inline-ranking-boards">
+      <section id="ranking-panel-1" class="inline-ranking-board" role="tabpanel" aria-labelledby="ranking-tab-1"><div class="inline-ranking-label"><h3 id="ranking-phase-1">1페이즈</h3><span>점수 TOP 10</span></div><p id="ranking-status-1" class="inline-ranking-status" role="status">순위를 확인하고 있어요.</p><table><thead><tr><th scope="col">순위</th><th scope="col">이름</th><th scope="col">점수</th></tr></thead><tbody id="ranking-rows-1"></tbody></table></section>
+      <section id="ranking-panel-2" class="inline-ranking-board" role="tabpanel" aria-labelledby="ranking-tab-2" hidden><div class="inline-ranking-label"><h3 id="ranking-phase-2">2페이즈</h3><span>생존 TOP 10</span></div><p id="ranking-status-2" class="inline-ranking-status" role="status">순위를 확인하고 있어요.</p><table><thead><tr><th scope="col">순위</th><th scope="col">이름</th><th scope="col">생존 시간</th><th scope="col">점수</th></tr></thead><tbody id="ranking-rows-2"></tbody></table></section>
+    </div>
+    <p class="inline-ranking-note">이름은 첫 글자만 표시됩니다.</p>
   </dialog>
   <div class="sr-only" id="game-status" role="status" aria-live="polite"></div>
 </body>

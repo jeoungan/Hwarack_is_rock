@@ -256,3 +256,31 @@ body[data-phone=true] .ranking-tab{min-height:40px;padding:7px 12px;font-size:12
 @media(max-width:600px){.brand-navigation{gap:10px}.brand-star{display:none}.brand-caption{display:none}.tools{gap:4px}.tool .sound-label{display:none}.record-contact-fields{grid-template-columns:1fr;gap:0}.record-form{padding:16px}.leaderboard-modal{padding:20px}.record-form #record-summary{margin-bottom:16px}}
 @media(max-width:380px){body[data-phone=true][data-portrait=true] .topbar{padding:0 8px;gap:6px}body[data-phone=true] .brand-navigation{gap:8px}.brand strong>span{display:none}body[data-phone=true] .ranking-tab{padding:7px 9px;font-size:11px;gap:6px}}
 @media(max-width:600px){body:not([data-phone=true]) .app{padding:0 10px}.topbar{gap:8px}.brand strong{font-size:13px}.brand strong>span{font-size:7px}.ranking-tab{min-height:40px;padding:7px 10px;font-size:12px;gap:8px}.tools{flex-shrink:0}.tool,#fullscreen{width:44px;min-height:44px;padding:6px;font-size:20px}#fullscreen span{display:none}}
+/* Switch between the two top tens without leaving the game. */
+.ranking-tab{font-family:inherit;cursor:pointer}
+.leaderboard-modal.ranking-modal{width:min(600px,96vw);max-width:96vw;padding:0;border-radius:16px}
+.inline-ranking-head{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:20px 24px;background:#211032;border-bottom:1px solid #784d92}
+.inline-ranking-head h2{margin:6px 0 0;color:#fff;font-size:26px;letter-spacing:-1px}
+.inline-ranking-head .eyebrow{color:#b2ffff}
+.inline-ranking-tools{display:flex;align-items:center;gap:12px;flex-shrink:0}
+#ranking-refresh{min-height:44px;padding:8px 12px;border:1px solid #876398;border-radius:8px;background:#352040;color:#d6ffff;font:inherit;font-size:12px;cursor:pointer}
+#ranking-refresh:disabled{opacity:.55;cursor:wait}
+.inline-ranking-tabs{display:flex;gap:10px;padding:18px 24px 0}
+.inline-ranking-tabs button{flex:1;min-height:46px;border:1px solid #75558e;border-radius:9px;padding:9px;background:#21132e;color:#c1adcf;font:inherit;font-size:14px;font-weight:700}
+.inline-ranking-tabs button[aria-selected=true]{background:#59315b;border-color:#ff9adb;color:#fff0b8;box-shadow:0 0 16px #ee73c817}
+.inline-ranking-boards{padding:16px 24px 0}
+.inline-ranking-board{min-width:0;padding:16px;border:1px solid #68447d;border-radius:12px;background:#150c27}
+.inline-ranking-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.inline-ranking-label h3{margin:0;font-size:20px;color:#ffb8eb}.inline-ranking-label>span{color:#b6fffc;font-size:11px;font-weight:700}
+.inline-ranking-board:nth-child(2) h3{color:#9dfffc}
+.inline-ranking-status{font-size:12px;line-height:1.6;color:#d4c2e5;margin:0 0 10px}.inline-ranking-status:empty{display:none}
+.inline-ranking-board table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.inline-ranking-board th{font-size:11px;font-weight:500;color:#bbabd0;text-align:left;padding:9px 5px;border-bottom:1px solid #765185;white-space:nowrap}
+.inline-ranking-board td{padding:11px 5px;border-bottom:1px solid #483051;white-space:nowrap}
+.inline-ranking-board th:nth-child(n+3),.inline-ranking-board td:nth-child(n+3){text-align:right}
+.inline-ranking-board td:first-child{width:36px;color:#ffe57b;font-weight:800}.inline-ranking-board td:last-child{font-weight:800}
+.inline-ranking-board tr:first-child:not(.ranking-vacant){background:#b04f961c}.inline-ranking-board tr:last-child td{border-bottom:0}
+.inline-ranking-board .ranking-vacant td{color:#9c88b0;font-weight:400}
+.inline-ranking-note{font-size:11px;color:#b4a1c8;text-align:center;margin:16px 20px 20px}
+@media(max-width:680px){.inline-ranking-boards{grid-template-columns:1fr;padding:14px 14px 0;gap:14px}.inline-ranking-head{padding:14px}.inline-ranking-head h2{font-size:22px}.inline-ranking-head .eyebrow{font-size:8px;letter-spacing:1px}.inline-ranking-tools{gap:8px}.inline-ranking-board{padding:14px}.inline-ranking-board td{padding:10px 4px}.inline-ranking-board th{padding:9px 4px}.inline-ranking-board td:first-child{width:32px}.inline-ranking-board table{font-size:12px}#ranking-refresh{padding:8px;font-size:11px}}
+@media(max-width:680px){.inline-ranking-tabs{padding:14px 14px 0;gap:8px}.inline-ranking-tabs button{font-size:12px}}
