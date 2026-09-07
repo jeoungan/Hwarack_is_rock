@@ -34,7 +34,7 @@
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
   let intermissionElapsed = 0, phaseOneScore = 0, encoreBeat = -1, titleElapsed = 0;
-  let best = Math.max(0, Number(storeGet('hwarak-best-music-v4', '0')) || 0);
+  let best = Math.max(0, Number(storeGet('hwarak-best-music-v5', '0')) || 0);
   // Start each fresh visit with sound enabled; one switch controls all media.
   const audio = { ctx: null, gain: null, enabled: true, nodes: new Set() };
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -462,7 +462,10 @@
     visible('sound-hint', mode === 'opening' && audio.enabled && openingMutedByPolicy);
   }
   function onJudge(event) {
-    if (event.judgement === 'stray') return;
+    if (event.judgement === 'stray') {
+      feedback = { start: time, label: '오입력', color: JUDGE_COLORS.miss, detail: '−3점 · 연속 초기화' };
+      return;
+    }
     const note = event.noteId == null ? null : session?.chart.find(note => note.id === event.noteId);
     if (note && session.phase === 1 && time - note.hit > .45) return;
     const now = time;
@@ -530,7 +533,7 @@
     window.HwarakLeaderboard?.begin(session.seed, phase);
     music.start(time);
     setMode('playing'); updateHUD();
-    $('game-status').textContent = phase === 2 ? '2페이즈 도전. Miss 누적 다섯 번에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다.';
+    $('game-status').textContent = phase === 2 ? '2페이즈 도전. Miss와 오입력 합계 다섯 번에 종료됩니다.' : 'Ready 세 번, Go 다음 연습 무대가 시작됩니다. 플레이 중 오입력은 3점 감점됩니다.';
   }
   function resetDepartedGame() {
     // A restored mobile tab can keep this entire JS session alive. Discard the
@@ -670,20 +673,20 @@
     const survival = session.phase === 2;
     const accuracy = session.accuracy, grade = accuracy >= 95 ? 'S' : accuracy >= 85 ? 'A' : accuracy >= 70 ? 'B' : 'C';
     const newBest = !survival && session.score > best;
-    if (newBest) { best = session.score; storeSet('hwarak-best-music-v4', best); }
+    if (newBest) { best = session.score; storeSet('hwarak-best-music-v5', best); }
     setText('result-title', survival ? '여기까지, 멋진 도전!' : '1페이즈 클리어!');
     setText('result-eyebrow', survival ? 'SURVIVAL RESULT' : 'READY FOR THE NEXT STAGE?');
     setText('result-score-label', survival ? '2페이즈 점수' : '1페이즈 점수');
     visible('result-grade', !survival); visible('survival-result', survival);
     setText('result-survival-time', formatTime(session.endTime || 0, true));
     setText('challenge-button', survival ? '도전 다시하기' : '도전하기');
-    setText('challenge-rules', survival ? `MISS 5 / 5 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '1.6배속 출발 · 90초마다 +1.0배속 · Miss 누적 5회면 탈락');
+    setText('challenge-rules', survival ? `MISS ${session.counts.miss} + 오입력 ${session.counts.stray} = 5 / 5 · 최종 ${C.speedAt(time, 2).toFixed(2)}배속` : '1.6배속 출발 · 90초마다 +1.0배속 · Miss·오입력 합계 5회면 탈락');
     visible('combined-result', survival);
     setText('combined-result', `1페이즈 ${phaseOneScore.toLocaleString('ko-KR')}점 · 합산 ${(phaseOneScore + session.score).toLocaleString('ko-KR')}점`);
     setText('result-grade', grade); setText('result-score', session.score.toLocaleString('ko-KR'));
     setText('result-combo', String(session.maxCombo)); setText('result-accuracy', accuracy.toFixed(1) + '%');
-    setText('result-breakdown', `기본 ${session.baseScore} + Perfect 보너스 ${session.bonusScore}`);
-    setText('result-counts', `PERFECT ${session.counts.perfect} · SPECIAL ${session.counts.special} · GREAT ${session.counts.great} · GOOD ${session.counts.good} · MISS ${session.counts.miss}`);
+    setText('result-breakdown', `기본 ${session.baseScore} + Perfect 보너스 ${session.bonusScore} − 오입력 감점 ${session.penaltyScore}${session.penaltyScore ? ' (최소 0점)' : ''}`);
+    setText('result-counts', `PERFECT ${session.counts.perfect} · SPECIAL ${session.counts.special} · GREAT ${session.counts.great} · GOOD ${session.counts.good} · MISS ${session.counts.miss} · 오입력 ${session.counts.stray}`);
     $('game-status').textContent = survival ? `도전 종료. 버틴 시간 ${formatTime(time, true)}, 2페이즈 점수 ${session.score}.` : `1페이즈 완료. 점수 ${session.score}. 도전하기 또는 처음부터 다시를 선택하세요.`;
   }
   function updateHUD() {
@@ -700,10 +703,10 @@
     const encore = mode === 'intermission';
     setText('combo', encore ? '끝까지 해냈다!' : session.combo ? `${session.combo} COMBO!` : elapsed < C.FIRST_HIT ? '첫 박자를 기다리는 중' : '다음 박자에 다시!');
     setText('phase-label', encore ? 'ENCORE' : survival ? 'SURVIVAL' : practice ? 'WARM UP' : 'PHASE 1'); setText('phase-title', encore ? '앙코르!' : survival ? '2페이즈 도전' : practice ? '연습 무대' : '본무대');
-    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `MISS ${session.failures} / 5` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(C.PRACTICE - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
+    setText('phase-detail', encore ? '함께 추는 마지막 춤' : survival ? `MISS·오입력 ${session.failures} / 5` : practice ? `단일 노트 · ${Math.max(0, Math.ceil(C.PRACTICE - elapsed))}초 후 본무대` : '두 개씩, 더 빠르게!');
     visible('survival-lives', survival);
     [...$('survival-lives').children].forEach((life, i) => life.classList.toggle('lost', i < session.failures));
-    $('survival-lives').setAttribute('aria-label', `Miss ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
+    $('survival-lives').setAttribute('aria-label', `Miss와 오입력 합계 ${session.failures}회, ${C.FAILURE_LIMIT - session.failures}회 남음`);
     setText('speed', `SPEED ×${C.speedAt(elapsed, session.phase).toFixed(2)}`);
     $('round-progress-fill').style.width = `${survival ? (1 - session.failures / C.FAILURE_LIMIT) * 100 : clamp(elapsed / C.DURATION) * 100}%`;
     const beat = ((Math.floor((elapsed - C.BEAT_OFFSET) / C.BEAT) % 4) + 4) % 4;
@@ -860,7 +863,7 @@
     intermissionRemaining: mode === 'intermission' ? +(C.INTERMISSION - intermissionElapsed).toFixed(3) : 0,
     rendering: { quality: quality.profile.name, ratio: +renderRatio.toFixed(2), motesPerHit: quality.profile.motes, automaticChanges: quality.changes, cachedLayers: staticLayers.size },
     score: session?.score || 0, combo: session?.combo || 0, maxCombo: session?.maxCombo || 0, accuracy: +(session?.accuracy ?? 100).toFixed(2),
-    baseScore: session?.baseScore || 0, bonusScore: session?.bonusScore || 0, perfectStreak: session?.perfectStreak || 0,
+    baseScore: session?.baseScore || 0, bonusScore: session?.bonusScore || 0, penaltyScore: session?.penaltyScore || 0, perfectStreak: session?.perfectStreak || 0,
     beatMotion: beatMotion(Math.max(0, time)), backgroundLoaded: !!textures.background,
     opening: mode === 'playing' ? openingCue(time) : null,
     introVideo: { time: +openingVideo.currentTime.toFixed(2), duration: Number.isFinite(openingVideo.duration) ? openingVideo.duration : null,

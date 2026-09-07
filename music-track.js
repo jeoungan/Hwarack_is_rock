@@ -4,7 +4,7 @@
   else root.HwarakTrack = track;
 })(globalThis, function () {
   return {
-    version: 4, title: 'Dance Dance Music', artist: 'The Mountain',
+    version: 5, title: 'Dance Dance Music', artist: 'The Mountain',
     asset: 'beats/the_mountain-dance-dance-music-576566.mp3',
     bpm: 100, beatOffset: 0.465, firstBeat: 4,
     // 32 whole bars, with both boundaries immediately before the same beat phase.

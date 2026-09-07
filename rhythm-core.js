@@ -14,7 +14,8 @@
   const SPECIAL = 0.130;
   const GREAT = 0.180;
   const GOOD = 0.240;
-  const POINTS = Object.freeze({ perfect: 5, special: 4, great: 3, good: 2, miss: 1 });
+  const POINTS = Object.freeze({ perfect: 5, special: 4, great: 3, good: 2, miss: 0 });
+  const STRAY_PENALTY = 3;
   const WINDOWS = [['perfect', PERFECT], ['special', SPECIAL], ['great', GREAT], ['good', GOOD]];
   const BONUS_CHARGE = 5;
   const CHORD_GAP = 0.18;
@@ -70,7 +71,7 @@
           lanes = pairs.splice(pairs.findLastIndex(compatible), 1)[0].slice();
         }
       }
-      const note = { id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {} };
+      const note = { id: id++, hit, spawn, travel, lanes, resolved: false, inputs: {}, attempts: {} };
       // One full beat, then two half beats: three notes every two beats.
       // This keeps musical accents and a breathing gap instead of constant eighths.
       beatIndex += phase === 2 || spawn >= PRACTICE ? [1, .5, .5][denseIndex++ % 3] : 1;
@@ -95,6 +96,7 @@
       this.score = 0;
       this.baseScore = 0;
       this.bonusScore = 0;
+      this.penaltyScore = 0;
       this.perfectStreak = 0;
       this.maxPerfectStreak = 0;
       this.combo = 0;
@@ -154,19 +156,36 @@
         if (this.perfectStreak > BONUS_CHARGE) bonus = 1;
       } else this.perfectStreak = 0;
       this.bonusScore += bonus;
-      this.score = this.baseScore + this.bonusScore;
+      this.updateScore();
       if (judgement === 'miss') this.combo = 0;
       else {
         this.combo++;
         this.maxCombo = Math.max(this.combo, this.maxCombo);
       }
-      if (this.phase === 2 && judgement === 'miss') {
-        this.failures++;
-        if (this.failures >= FAILURE_LIMIT) {
-          this.finished = true; this.endTime = Math.max(0, this.time); this.endReason = 'eliminated';
-        }
-      }
+      if (judgement === 'miss') this.fail();
       this.onJudge({ judgement, lanes: note.lanes, delta, noteId: note.id, points, bonus });
+    }
+    updateScore() {
+      // Keep every deduction even while the displayed score is clamped at zero.
+      this.score = Math.max(0, this.baseScore + this.bonusScore - this.penaltyScore);
+    }
+    fail() {
+      if (this.phase !== 2) return;
+      this.failures++;
+      if (this.failures >= FAILURE_LIMIT) {
+        this.finished = true; this.endTime = Math.max(0, this.time); this.endReason = 'eliminated';
+      }
+    }
+    stray(lane) {
+      // Ready/Go and the approach to the first timing window are free practice.
+      // Keep the last note's full window active, including extra keys after a hit.
+      if (this.time < FIRST_HIT - GOOD - 1e-9 ||
+          (this.phase === 1 && this.time > this.chart.at(-1).hit + GOOD + 1e-9)) return;
+      this.counts.stray++;
+      this.penaltyScore += STRAY_PENALTY;
+      this.combo = 0; this.perfectStreak = 0;
+      this.updateScore(); this.fail();
+      this.onJudge({ judgement: 'stray', lanes: [lane], delta: null, noteId: null, points: -STRAY_PENALTY, bonus: 0 });
     }
     press(lane, time) {
       if (this.finished || this.held.has(lane)) return;
@@ -176,16 +195,13 @@
       if (this.finished) return;
       const note = this.chart.filter(n => !n.resolved && n.lanes.includes(lane) && Math.abs(n.hit - time) <= GOOD + 1e-9)
         .sort((a, b) => Math.abs(a.hit - time) - Math.abs(b.hit - time))[0];
-      if (!note) {
-        // A distant/absent note is not a judgement. Only an actually missed note
-        // breaks the combo; warm-up taps never change score or accuracy.
-        return;
-      }
-      note.inputs[lane] = { time, delta: time - note.hit };
+      if (!note || note.attempts[lane]) { this.stray(lane); return; }
+      note.inputs[lane] = note.attempts[lane] = { time, delta: time - note.hit };
       // A quick tap remains valid after release so a natural two-finger roll
-      // is accepted; holding a key still cannot hit any later note.
-      if (!note.lanes.every(key => note.inputs[key])) return;
-      const inputs = note.lanes.map(key => note.inputs[key]);
+      // is accepted. The FIRST attempt is immutable, even after its chord gap
+      // expires: re-tapping cannot replace an early attempt with a better one.
+      if (!note.lanes.every(key => note.attempts[key])) return;
+      const inputs = note.lanes.map(key => note.attempts[key]);
       if (Math.max(...inputs.map(x => x.time)) - Math.min(...inputs.map(x => x.time)) > CHORD_GAP + 1e-9) return;
       const worst = inputs.reduce((a, b) => Math.abs(a.delta) > Math.abs(b.delta) ? a : b);
       this.resolve(note, WINDOWS.find(([, limit]) => Math.abs(worst.delta) <= limit + 1e-9)[0], worst.delta);
@@ -195,7 +211,6 @@
     }
     clearHeld() {
       this.held.clear();
-      for (const note of this.chart) if (!note.resolved) note.inputs = {};
     }
     get accuracy() {
       const { perfect, special, great, good, miss, stray } = this.counts;
@@ -207,5 +222,5 @@
       return this.chart.filter(n => !n.resolved && time >= n.spawn && time <= n.hit + GOOD);
     }
   }
-  return { DURATION, PRACTICE, BEAT, BEAT_OFFSET, FIRST_HIT, CHART_VERSION: track.version, PERFECT, SPECIAL, GREAT, GOOD, POINTS, BONUS_CHARGE, CHORD_GAP, FAILURE_LIMIT, INTERMISSION, PAIRS, KEYS, speedAt, travelAt, createChart, Session };
+  return { DURATION, PRACTICE, BEAT, BEAT_OFFSET, FIRST_HIT, CHART_VERSION: track.version, PERFECT, SPECIAL, GREAT, GOOD, POINTS, STRAY_PENALTY, BONUS_CHARGE, CHORD_GAP, FAILURE_LIMIT, INTERMISSION, PAIRS, KEYS, speedAt, travelAt, createChart, Session };
 });

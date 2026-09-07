@@ -284,3 +284,6 @@ body[data-phone=true] .ranking-tab{min-height:40px;padding:7px 12px;font-size:12
 .inline-ranking-note{font-size:11px;color:#b4a1c8;text-align:center;margin:16px 20px 20px}
 @media(max-width:680px){.inline-ranking-boards{grid-template-columns:1fr;padding:14px 14px 0;gap:14px}.inline-ranking-head{padding:14px}.inline-ranking-head h2{font-size:22px}.inline-ranking-head .eyebrow{font-size:8px;letter-spacing:1px}.inline-ranking-tools{gap:8px}.inline-ranking-board{padding:14px}.inline-ranking-board td{padding:10px 4px}.inline-ranking-board th{padding:9px 4px}.inline-ranking-board td:first-child{width:32px}.inline-ranking-board table{font-size:12px}#ranking-refresh{padding:8px;font-size:11px}}
 @media(max-width:680px){.inline-ranking-tabs{padding:14px 14px 0;gap:8px}.inline-ranking-tabs button{font-size:12px}}
+
+/* Keep Korean judgement names and score descriptions readable on small screens. */
+.phase-result .score-caption,.phase-result .result-counts{word-break:keep-all;letter-spacing:0}

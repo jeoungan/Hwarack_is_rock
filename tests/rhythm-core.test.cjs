@@ -22,7 +22,7 @@ test('same seed reproduces a chart; a new seed changes it', () => {
   assert.deepEqual(C.createChart(7), C.createChart(7));
   assert.notDeepEqual(C.createChart(7).map(n => n.lanes), C.createChart(8).map(n => n.lanes));
 });
-test('five timing grades have inclusive boundaries, symmetric early/late windows and 5/4/3/2/1 points', () => {
+test('five timing grades have inclusive boundaries, symmetric early/late windows and 5/4/3/2/0 points', () => {
   for (const sign of [-1, 1]) for (const [delta, grade] of [[0, 'perfect'], [.08, 'perfect'], [.0801, 'special'], [.13, 'special'], [.1301, 'great'], [.18, 'great'], [.1801, 'good'], [.24, 'good']]) {
     const s = new C.Session(5), n = s.chart[0];
     s.press(n.lanes[0], n.hit + sign * delta);
@@ -30,8 +30,8 @@ test('five timing grades have inclusive boundaries, symmetric early/late windows
     assert.equal(s.score, C.POINTS[grade]);
   }
   const s = new C.Session(5); s.advance(s.chart[0].hit + .2401);
-  assert.equal(s.chart[0].judgement, 'miss'); assert.equal(s.score, 1);
-  s.advance(s.chart[0].hit + .3); assert.equal(s.score, 1, 'a miss is scored once');
+  assert.equal(s.chart[0].judgement, 'miss'); assert.equal(s.score, 0);
+  s.advance(s.chart[0].hit + .3); assert.equal(s.score, 0, 'a miss never awards points'); assert.equal(s.counts.miss, 1);
 });
 test('a chord accepts two timely presses and counts as one displayed judgement and streak event', () => {
   const s = new C.Session(9), chord = s.chart.find(n => n.lanes.length === 2);
@@ -50,10 +50,10 @@ test('chord taps more than 180ms apart expire, whether held or released', () => 
     if (separated) s.release(chord.lanes[0]);
     s.press(chord.lanes[1], chord.hit + .10);
     s.advance(chord.hit + .25);
-    assert.equal(chord.judgement, 'miss'); assert.equal(s.score, s.counts.miss);
+    assert.equal(chord.judgement, 'miss'); assert.equal(s.score, 0);
   }
 });
-test('held/repeated input cannot clear later notes; only missed notes break a combo', () => {
+test('held/repeated input cannot clear later notes; held keys never generate repeat attempts', () => {
   const s = new C.Session(15), first = s.chart[0];
   s.press(first.lanes[0], first.hit);
   const later = s.chart.find(n => n.id > first.id && n.lanes.includes(first.lanes[0]));
@@ -64,7 +64,7 @@ test('held/repeated input cannot clear later notes; only missed notes break a co
 });
 test('all misses still complete the two-minute round', () => {
   const s = new C.Session(5); s.advance(120);
-  assert.equal(s.finished, true); assert.equal(s.score, s.chart.length);
+  assert.equal(s.finished, true); assert.equal(s.score, 0);
   assert.equal(s.counts.miss, s.chart.length);
   assert.equal(s.accuracy, 0);
 });
@@ -103,7 +103,7 @@ test('empty taps and repeated resolution cannot farm points', () => {
   const s = new C.Session(12), n = s.chart[0]; hit(s, n);
   s.resolve(n, 'perfect', 0); assert.equal(s.score, 5);
   for (let i = 0; i < 40; i++) { s.press(0, n.hit + .3); s.release(0); }
-  assert.equal(s.score, 5); assert.equal(s.perfectStreak, 1); assert.equal(s.counts.stray, 0); assert.equal(s.accuracy, 100);
+  assert.equal(s.score, 0); assert.equal(s.perfectStreak, 0); assert.equal(s.counts.stray, 40); assert.equal(s.penaltyScore, 120); assert.equal(s.accuracy, 100 / 41);
 });
 test('a fully Perfect round has exactly chart.length - 5 bonus points including chords', () => {
   const s = new C.Session(42); for (const n of s.chart) hit(s, n); s.advance(120);
@@ -140,9 +140,9 @@ test('a failed two-key chord consumes one life; late input cannot score after th
   const s = new C.Session(3, () => {}, { phase: 2 });
   const chord = s.chart[0]; assert.equal(chord.lanes.length, 2);
   s.press(chord.lanes[0], chord.hit); s.release(chord.lanes[0]); s.advance(chord.hit + .25);
-  assert.equal(s.failures, 1); assert.equal(s.score, 1);
+  assert.equal(s.failures, 1); assert.equal(s.score, 0);
   s.press(0, 100);
-  assert.equal(s.failures, 5); assert.equal(s.score, 5); assert.equal(s.counts.stray, 0);
+  assert.equal(s.failures, 5); assert.equal(s.score, 0); assert.equal(s.counts.stray, 0);
   assert.ok(Math.abs(s.endTime - (C.FIRST_HIT + 1.8 + C.GOOD)) < 1e-8); assert.equal(s.time, s.endTime);
 });
 
@@ -167,7 +167,7 @@ test('ten minutes of survival generate fresh notes on the beat with bounded memo
   assert.ok(s.time >= 600 && s.time < 600 + C.BEAT); assert.ok(C.speedAt(s.time, 2) >= 8);
 });
 
-test('before the first note and between notes, empty taps never emit a judgement or damage a charged streak', () => {
+test('warm-up taps are free; empty taps during the round deduct points and break the streak', () => {
   const events = [], s = new C.Session(42, e => events.push(e));
   for (const at of [-3, 0, .5, 1.5, C.FIRST_HIT - .25]) for (let lane = 0; lane < 4; lane++) {
     s.press(lane, at); s.release(lane);
@@ -176,11 +176,11 @@ test('before the first note and between notes, empty taps never emit a judgement
   for (const n of s.chart.slice(0, 6)) hit(s, n);
   const before = { score: s.score, combo: s.combo, bonus: s.bonusScore, accuracy: s.accuracy };
   for (let lane = 0; lane < 4; lane++) { s.press(lane, s.chart[6].hit - .3); s.release(lane); }
-  assert.deepEqual({ score: s.score, combo: s.combo, bonus: s.bonusScore, accuracy: s.accuracy }, before);
-  hit(s, s.chart[6]); assert.equal(s.bonusScore, 2); assert.equal(s.counts.stray, 0);
+  assert.equal(s.score, before.score - 12); assert.equal(s.combo, 0); assert.equal(s.bonusScore, before.bonus); assert.equal(s.accuracy, 60);
+  hit(s, s.chart[6]); assert.equal(s.bonusScore, 1); assert.equal(s.counts.stray, 4); assert.equal(s.perfectStreak, 1);
 });
-test('music chart v4 moderates density and leaves enough time for the final late window', () => {
-  assert.equal(C.PRACTICE, 15); assert.equal(C.CHART_VERSION, 4); assert.equal(C.BEAT, .6);
+test('music chart v5 preserves density and leaves enough time for the final late window', () => {
+  assert.equal(C.PRACTICE, 15); assert.equal(C.CHART_VERSION, 5); assert.equal(C.BEAT, .6);
   for (const seed of [1, 42, 999]) {
     const chart = C.createChart(seed);
     assert.equal(chart.length, 280); assert.equal(chart[0].hit, 2.865);
@@ -213,4 +213,117 @@ test('rolled chord taps stay valid after the first finger is lifted, including t
 test('survival alternates breathing beats and half-beat accents', () => {
   const s = new C.Session(42, () => {}, { phase: 2 }); s.fillAhead(7);
   assert.deepEqual(s.chart.slice(0, 7).map(n => n.hit), [2.865, 3.465, 3.765, 4.065, 4.665, 4.965, 5.265]);
+});
+
+test('wrong keys cost three points without consuming a real note; all five grades still total 280', () => {
+  const s = new C.Session(42), n = s.chart[0], wrong = (n.lanes[0] + 1) % 4;
+  s.press(wrong, n.hit); s.release(wrong);
+  assert.equal(n.resolved, false); assert.equal(s.counts.stray, 1);
+  hit(s, n); assert.equal(s.score, 2); assert.equal(s.accuracy, 50);
+  s.advance(120);
+  assert.equal(s.counts.perfect + s.counts.special + s.counts.great + s.counts.good + s.counts.miss, 280);
+});
+
+test('deductions persist at zero and are not erased by the next successful note', () => {
+  const s = new C.Session(42), n = s.chart[0], wrong = (n.lanes[0] + 1) % 4;
+  for (let i = 0; i < 2; i++) { s.press(wrong, n.hit - .20 + i * .01); s.release(wrong); }
+  assert.equal(s.score, 0); assert.equal(s.penaltyScore, 6);
+  hit(s, n); assert.equal(s.score, 0);
+  hit(s, s.chart[1]); assert.equal(s.score, 4);
+});
+
+test('a chord first attempt cannot be improved by re-tapping or clearing held keys', () => {
+  for (const clear of [false, true]) {
+    const s = new C.Session(42), n = s.chart.find(n => n.lanes.length === 2);
+    s.press(n.lanes[0], n.hit - .10); s.release(n.lanes[0]);
+    if (clear) s.clearHeld();
+    s.press(n.lanes[0], n.hit); s.release(n.lanes[0]);
+    s.press(n.lanes[1], n.hit); s.release(n.lanes[1]);
+    assert.equal(n.judgement, 'special'); assert.equal(s.counts.stray, 1);
+    assert.equal(n.attempts[n.lanes[0]].time, n.hit - .10);
+  }
+});
+
+test('expired chord attempts cannot be retried within the late timing window', () => {
+  const s = new C.Session(42), n = s.chart.find(n => n.lanes.length === 2);
+  s.press(n.lanes[0], n.hit - .23); s.release(n.lanes[0]);
+  s.advance(n.hit); assert.equal(n.inputs[n.lanes[0]], undefined);
+  hit(s, n); s.advance(n.hit + .25);
+  assert.equal(n.judgement, 'miss'); assert.equal(s.counts.stray, 1);
+  assert.equal(s.counts.perfect, 0);
+});
+
+test('100 random charts still allow a 280-combo all-Perfect round worth exactly 1675', () => {
+  for (let seed = 1; seed <= 100; seed++) {
+    const s = new C.Session(seed);
+    for (const n of s.chart) hit(s, n);
+    s.advance(120);
+    assert.equal(s.score, 1675); assert.equal(s.counts.stray, 0);
+    assert.equal(s.maxCombo, 280); assert.equal(s.accuracy, 100);
+  }
+});
+
+test('500 bursts of all four keys and faster blind mashing cannot earn a positive phase-one score', () => {
+  for (const seed of [1, 7, 42, 100]) for (const step of [.24, .12, .06]) {
+    const s = new C.Session(seed);
+    for (let i = 0; i * step < 120; i++) {
+      for (let lane = 0; lane < 4; lane++) s.press(lane, i * step);
+      for (let lane = 0; lane < 4; lane++) s.release(lane);
+    }
+    s.advance(120);
+    assert.equal(s.score, 0); assert.equal(s.combo, 0); assert.ok(s.counts.stray > 0);
+    assert.equal(s.bonusScore, 0);
+  }
+});
+
+test('pressing all four keys on every correct beat no longer bypasses lane selection', () => {
+  const s = new C.Session(42);
+  for (const n of s.chart) {
+    for (let lane = 0; lane < 4; lane++) s.press(lane, n.hit);
+    for (let lane = 0; lane < 4; lane++) s.release(lane);
+  }
+  s.advance(120);
+  assert.equal(s.counts.perfect, 280); assert.equal(s.score, 0);
+  assert.ok(s.accuracy < 30); assert.ok(s.maxCombo < 3); assert.equal(s.bonusScore, 0);
+});
+
+test('five wrong attempts end survival before a single note resolves, then freeze all state', () => {
+  const events = [], s = new C.Session(42, e => events.push(e), { phase: 2 });
+  const n = s.chart[0], wrong = [0, 1, 2, 3].find(lane => !n.lanes.includes(lane));
+  for (let i = 0; i < 5; i++) { s.press(wrong, n.hit - .20 + i * .01); s.release(wrong); }
+  assert.equal(s.finished, true); assert.equal(s.counts.stray, 5); assert.equal(s.counts.miss, 0);
+  assert.equal(s.endTime, n.hit - .16); assert.equal(s.failures, 5); assert.equal(events.length, 5);
+  const frozen = JSON.stringify({ score: s.score, counts: s.counts, endTime: s.endTime });
+  s.advance(600); s.press(wrong, 600); s.resolve(n, 'perfect', 0);
+  assert.equal(JSON.stringify({ score: s.score, counts: s.counts, endTime: s.endTime }), frozen);
+});
+
+test('Miss and wrong attempts share the five-failure limit; normal chord presses count once', () => {
+  const s = new C.Session(42, () => {}, { phase: 2 });
+  s.advance(s.chart[0].hit + .25); assert.equal(s.failures, 1);
+  const n = s.chart.find(n => !n.resolved);
+  hit(s, n); assert.equal(s.failures, 1);
+  for (let i = 0; i < 4; i++) { s.press(n.lanes[0], n.hit + .01 * (i + 1)); s.release(n.lanes[0]); }
+  assert.equal(s.finished, true); assert.equal(s.counts.miss, 1); assert.equal(s.counts.stray, 4);
+});
+
+test('blind four-key mashing cannot keep the challenge alive', () => {
+  for (const step of [.24, .12, .06]) {
+    const s = new C.Session(42, () => {}, { phase: 2 });
+    for (let i = 0; i * step < 10 && !s.finished; i++) {
+      for (let lane = 0; lane < 4; lane++) s.press(lane, i * step);
+      for (let lane = 0; lane < 4; lane++) s.release(lane);
+    }
+    assert.equal(s.finished, true); assert.equal(s.failures, 5);
+    assert.ok(s.endTime < 4); assert.equal(s.score, 0);
+  }
+});
+
+test('last-note extra keys are penalized, but waiting after its full window is free', () => {
+  const s = new C.Session(42), n = s.chart.at(-1);
+  for (const note of s.chart) hit(s, note);
+  s.press(n.lanes[0], n.hit + .01); s.release(n.lanes[0]);
+  assert.equal(s.score, 1672); assert.equal(s.counts.stray, 1);
+  s.press(n.lanes[0], n.hit + .25); s.release(n.lanes[0]);
+  assert.equal(s.counts.stray, 1);
 });
