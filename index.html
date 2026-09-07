@@ -38,7 +38,10 @@
 <body>
   <main class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><strong>HWARAK<span>LIVE</span></strong><span class="brand-caption">오늘 무대의 주인공, 너.</span></div>
+      <div class="brand-navigation">
+        <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><strong>HWARAK<span>LIVE</span></strong><span class="brand-caption">오늘 무대의 주인공, 너.</span></div>
+        <nav class="game-navigation" aria-label="게임 메뉴"><a id="ranking-tab" class="ranking-tab" href="https://hwarak-records.web.app/" target="_blank" rel="noopener noreferrer">순위 확인하기 <span aria-hidden="true">↗</span><span class="sr-only"> (새 탭)</span></a></nav>
+      </div>
       <div class="tools">
         <button id="sound-toggle" class="tool" aria-pressed="true" aria-label="영상과 음악 소리 끄기"><span aria-hidden="true">♫</span> <span class="sound-label">소리 끄기</span></button>
         <button id="fullscreen" class="tool" aria-label="전체 화면">⛶ <span>전체 화면</span></button>
@@ -109,11 +112,16 @@
   </main>
   <dialog id="leaderboard-modal" class="leaderboard-modal" aria-labelledby="leaderboard-heading">
     <div class="leaderboard-top"><div><span class="eyebrow">HWARAK LIVE</span><h2 id="leaderboard-heading">오늘의 기록 남기기</h2></div><button id="leaderboard-close" class="leaderboard-close" aria-label="기록 저장 닫기">×</button></div>
-    <form id="record-form" class="record-form">
+    <form id="record-form" class="record-form" novalidate>
       <p id="record-summary"></p>
-      <label for="record-name">기록에 남길 이름 또는 별명</label>
-      <div class="record-input-row"><input id="record-name" name="name" type="text" maxlength="32" required autocomplete="off" placeholder="이름 또는 별명 · 1~16자"><button id="record-submit" type="submit">기록 저장하기</button></div>
-      <p class="record-notice">원하는 분만 저장해 주세요. 상위 기록의 점수·등급·생존 시간은 별도 대시보드에 표시되며, 이름은 첫 글자 뒤에 **로 가립니다. 전체 이름은 행사 운영자만 Firebase 관리 화면에서 확인합니다.</p>
+      <div class="record-field"><label for="record-name">이름 또는 닉네임 <span>필수</span></label><input id="record-name" name="name" type="text" maxlength="32" required autocomplete="off" placeholder="이름 또는 닉네임 · 1~16자" aria-describedby="record-name-error record-privacy"><p id="record-name-error" class="record-error" hidden></p></div>
+      <div class="record-contact-fields">
+        <div class="record-field"><label for="record-phone">전화번호 <span>선택</span></label><input id="record-phone" name="phone" type="tel" inputmode="tel" maxlength="32" autocomplete="tel" placeholder="010-1234-5678" aria-describedby="record-phone-error record-contact-notice"><p id="record-phone-error" class="record-error" hidden></p></div>
+        <div class="record-field"><label for="record-email">이메일 <span>선택</span></label><input id="record-email" name="email" type="email" inputmode="email" maxlength="254" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="yourname@example.com" aria-describedby="record-email-error record-contact-notice"><p id="record-email-error" class="record-error" hidden></p></div>
+      </div>
+      <p id="record-contact-notice" class="record-contact-notice">연락처는 경품 안내에만 사용하며 순위표에는 공개하지 않아요. 행사 종료 후 운영자가 파기합니다. 연락처 없이도 기록을 저장할 수 있어요.</p>
+      <p id="record-privacy" class="record-notice">순위에는 이름 첫 글자와 **, 게임 기록만 표시됩니다. 전체 이름과 연락처는 행사 운영자만 확인할 수 있어요.</p>
+      <button id="record-submit" class="record-submit" type="submit">기록 저장하기 <span aria-hidden="true">↗</span></button>
       <p id="record-status" class="record-status" role="status"></p>
     </form>
   </dialog>

@@ -224,3 +224,34 @@ body[data-phone=true][data-portrait=true] .record-actions .ranking-link{min-heig
 @media(orientation:portrait){.title-screen{padding-bottom:24px}.title-art{flex:none;height:32%;max-height:none}.title-actions{margin-top:auto;margin-bottom:0}}
 body[data-phone=true][data-portrait=true] .title-art{height:28%}
 body[data-phone=true][data-portrait=true] .title-actions{margin-top:auto}
+
+/* Ranking stays beside the brand; contact details live only in the save dialog. */
+.brand-navigation{display:flex;align-items:center;gap:24px;min-width:0}
+.game-navigation{display:flex;flex-shrink:0}
+.ranking-tab{display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:44px;padding:10px 16px;border:1px solid #8560a6;border-radius:10px;background:linear-gradient(120deg,#34204f,#251538);color:#d5ffff;font-size:13px;font-weight:800;text-decoration:none;white-space:nowrap;box-shadow:inset 0 1px 0 #ffffff0d}
+.ranking-tab:hover{border-color:#91f7f5;background:#3e2758;box-shadow:0 0 18px #62fff51a}
+.ranking-tab:focus-visible{outline:2px solid #8fffff;outline-offset:3px}
+.ranking-tab>span[aria-hidden]{color:#ffb6ec;font-size:18px}
+.leaderboard-modal{width:min(600px,94vw);padding:28px;overscroll-behavior:contain}
+.record-form{padding:20px;margin-bottom:0;border-color:#875599;background:linear-gradient(140deg,#52254b55,#20133188)}
+.record-form #record-summary{padding-bottom:14px;margin-bottom:18px;border-bottom:1px solid #8d639b55;font-size:15px}
+.record-field{min-width:0;margin-bottom:16px}
+.record-form label{font-size:14px;margin-bottom:8px;font-weight:700}
+.record-form label>span{margin-left:5px;color:#bdb0d1;font-size:11px;font-weight:400}
+.record-field input{width:100%;min-width:0;min-height:50px;padding:12px 14px;border:1px solid #82639c;border-radius:9px;background:#100b23;color:#fff;font:inherit;font-size:16px;line-height:1.5;touch-action:manipulation}
+.record-field input::placeholder{color:#a99ab8;opacity:1}
+.record-field input:disabled{opacity:.7}
+.record-field input[aria-invalid=true]{border-color:#ff9bbb}
+.record-contact-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.record-error{font-size:12px;line-height:1.5;color:#ffb6cf;margin:6px 0 0}
+.record-contact-notice{font-size:12px;line-height:1.8;color:#e1daef;margin:0;padding:12px 14px;border:1px solid #63dce22e;border-radius:8px;background:#53d9dc09}
+.record-notice{font-size:11px;line-height:1.7;margin:12px 0 18px;color:#bfb0d0}
+.record-submit{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;min-height:52px;padding:12px 18px;border:1px solid #ffee91;border-radius:9px;background:#ffe56d;color:#25132e;font:inherit;font-size:17px;font-weight:850;cursor:pointer;box-shadow:0 3px 0 #98632b,0 0 20px #ffd96315}
+.record-submit:hover{background:#fff096}
+.record-submit:disabled{opacity:.65;cursor:default;box-shadow:none}
+.record-status{margin-top:14px}
+@media(max-width:1100px){.brand-navigation{gap:18px}.brand-caption{display:none}}
+body[data-phone=true] .brand-navigation{gap:12px}
+body[data-phone=true] .ranking-tab{min-height:40px;padding:7px 12px;font-size:12px;gap:8px}
+@media(max-width:600px){.brand-navigation{gap:10px}.brand-star{display:none}.brand-caption{display:none}.tools{gap:4px}.tool .sound-label{display:none}.record-contact-fields{grid-template-columns:1fr;gap:0}.record-form{padding:16px}.leaderboard-modal{padding:20px}.record-form #record-summary{margin-bottom:16px}}
+@media(max-width:380px){body[data-phone=true][data-portrait=true] .topbar{padding:0 8px;gap:6px}body[data-phone=true] .brand-navigation{gap:8px}.brand strong>span{display:none}body[data-phone=true] .ranking-tab{padding:7px 9px;font-size:11px;gap:6px}}

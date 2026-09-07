@@ -31,6 +31,7 @@
   let width = 1400, height = 800, phone = false, portrait = false, ready = false, session = null;
   let mode = 'opening', time = -INTRO_DURATION, baseTime = -INTRO_DURATION, anchor = 0, manual = false;
   let openingPlayPending = false, openingMutedByPolicy = false, revealTimer = null, titleLogoLoaded = false;
+  let rankingDepartureUntil = 0, rankingTabAway = false;
   let pose = 'normal', lastLane = 0, lastFrame = performance.now(), resumeRemaining = 0, lastHitTime = -99;
   let fx = [], feedback = null, phaseAnnounced = false;
   let intermissionElapsed = 0, phaseOneScore = 0, encoreBeat = -1, titleElapsed = 0;
@@ -520,6 +521,7 @@
   }
   function startGame(seed = randomSeed(), phase = 1) {
     if (!ready) return;
+    rankingDepartureUntil = 0; rankingTabAway = false;
     openingVideo.pause(); clearTimeout(revealTimer);
     visible('title-impact', false);
     stopAudio(); clearInputs(); fx = []; feedback = null; phaseAnnounced = false;
@@ -535,6 +537,7 @@
   function resetDepartedGame() {
     // A restored mobile tab can keep this entire JS session alive. Discard the
     // round before it is cached/hidden, instead of restoring a paused clock.
+    rankingDepartureUntil = 0; rankingTabAway = false;
     if (!session) return;
     window.HwarakLeaderboard?.abandon();
     stopAudio(); clearInputs(); session = null;
@@ -783,17 +786,22 @@
     if (event.repeat) return;
     if (event.code === 'KeyR' && mode === 'title') { event.preventDefault(); startFromTitle(); return; }
     if (event.code === 'Escape') { event.preventDefault(); if (mode === 'paused') resumeGame(); else pauseGame(); }
-    if (event.code === 'Enter' && mode === 'result' && event.target.tagName !== 'BUTTON') launchGame();
+    if (event.code === 'Enter' && mode === 'result' && !event.target.closest?.('button, a, select, [role="button"]')) launchGame();
   });
   window.addEventListener('keyup', event => { const lane = CODE_TO_LANE[event.code]; if (lane != null) release(lane, event.code); });
   window.addEventListener('blur', () => pauseGame('화면을 벗어나 잠시 멈췄어요. 준비되면 이어서 플레이하세요.'));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      if (phone) resetDepartedGame();
+      // The game's own ranking link preserves the round for the return trip.
+      // A blocked/background tab expires quickly and cannot exempt a later exit.
+      rankingTabAway ||= performance.now() < rankingDepartureUntil;
+      rankingDepartureUntil = 0;
+      if (phone && !rankingTabAway) resetDepartedGame();
       else pauseGame('화면을 벗어나 잠시 멈췄어요.');
       if (mode === 'intermission') stopAudio();
-    } else if (mode === 'intermission' && !manual) {
-      music.start(C.DURATION + intermissionElapsed);
+    } else {
+      rankingDepartureUntil = 0; rankingTabAway = false;
+      if (mode === 'intermission' && !manual) music.start(C.DURATION + intermissionElapsed);
     }
     syncOpeningPlayback();
   });
@@ -805,6 +813,11 @@
     lastFrame = performance.now(); syncOpeningPlayback();
   });
   window.addEventListener('resize', checkOrientation); document.addEventListener('fullscreenchange', resize);
+  $('ranking-tab').addEventListener('click', event => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    rankingDepartureUntil = performance.now() + 1500;
+    pauseGame('순위를 확인하고 돌아오면 이어서 플레이할 수 있어요.');
+  });
   $('start-button').addEventListener('click', startFromTitle);
   $('title-challenge-button').addEventListener('click', () => { if (mode === 'title' && ready) launchGame(2); });
   openingVideo.addEventListener('ended', finishOpening);
